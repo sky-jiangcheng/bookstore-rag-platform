@@ -1,0 +1,32 @@
+# Auth 服务 Railway 配置
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+[deploy.resources]
+memory = "512"
+cpu = "0.5"
+
+[[services]]
+name = "auth"
+type = "web"
+plan = "free"
+
+[[services.healthCheck]]
+path = "/health"
+interval = 30
+timeout = 10
+retries = 3
+
+# DATABASE_URL = "${{Postgres.DATABASE_URL}}"
+# REDIS_URL = "${{Redis.REDIS_URL}}"
+# JWT_SECRET_KEY = "${{JWT_SECRET_KEY}}"
+# CORS_ORIGINS = "https://bookstore-agentic-rag.vercel.app"
+# PORT = "8000"

@@ -1,0 +1,671 @@
+# ================================================================================
+# 应用配置文件
+# ================================================================================
+#
+# 本文件包含所有环境的配置，支持 development（开发）、testing（测试）、production（生产）
+#
+# 环境切换：
+#   export APP_ENV=production  # Linux/Mac
+#   set APP_ENV=production     # Windows
+#
+# 配置优先级（从高到低）：
+#   1. 环境变量（如 QDRANT_HOST, QDRANT_PORT, SECRET_KEY 等）
+#   2. config.yml 中对应环境的配置
+#   3. 代码中的硬编码默认值（仅作为fallback）
+#
+# 安全说明：
+#   - 生产环境必须修改所有默认密码和密钥
+#   - 建议使用环境变量覆盖敏感配置（如数据库密码、API密钥）
+#   - 不要将包含真实敏感信息的配置文件提交到版本控制系统
+#
+# ================================================================================
+# 开发环境
+# ================================================================================
+development:
+  # 模块配置
+  modules:
+    # 数据库配置 - 使用MySQL
+    database:
+      type: mysql
+      sqlite:
+        url: sqlite:///./bookstore.db
+      mysql:
+        host: localhost
+        port: 3306
+        database: bookstore
+        user: root
+        password: "${MYSQL_PASSWORD}"
+        charset: utf8mb4
+    # LLM服务配置
+    llm:
+      default_service: "gemini"
+      service_priority: ["gemini", "qwen", "ernie", "zhipu", "openai", "mock"]
+      providers:
+        # OpenAI配置
+        openai:
+          api_key: "${OPENAI_API_KEY}"
+          model: "gpt-3.5-turbo"
+          temperature: 0.7
+          max_tokens: 2000
+          base_url: "https://api.openai.com/v1"
+        # Google Gemini配置
+        gemini:
+          api_key: "${GEMINI_API_KEY}"
+          model: "gemini-pro"
+          temperature: 0.7
+          max_output_tokens: 2000
+        # 通义千问配置 (阿里云)
+        qwen:
+          api_key: "${QWEN_API_KEY}"
+          model: "qwen-turbo"  # 可选: qwen-turbo, qwen-plus, qwen-max
+          temperature: 0.7
+          max_tokens: 2000
+          base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        # 文心一言配置 (百度)
+        ernie:
+          api_key: "${ERNIE_API_KEY}"       # API Key
+          secret_key: "${ERNIE_SECRET_KEY}"    # Secret Key
+          model: "ERNIE-Bot-turbo"  # 可选: ERNIE-Bot, ERNIE-Bot-turbo, ERNIE-Bot-4
+          temperature: 0.7
+        # 智谱GLM配置 (智谱AI)
+        zhipu:
+          api_key: "${ZHIPU_API_KEY}"
+          model: "glm-4"  # 可选: glm-4, glm-3-turbo, glm-3
+          temperature: 0.7
+          max_tokens: 2000
+          base_url: "https://open.bigmodel.cn/api/paas/v4"
+        # 本地LLM配置 (Ollama等)
+        local:
+          base_url: "http://localhost:11434"
+          model: "llama2"
+          temperature: 0.7
+    # RAG服务配置
+    rag:
+      vector_db:
+        type: qdrant
+        collection: "bookstore"
+        path: "./vector_db"
+        timeout: 30
+      embedding:
+        model: "text-embedding-ada-002"
+        dimensions: 100
+        max_length: 512
+        device: "cpu"
+        # 注意：此维度必须与向量服务的default_dimension保持一致
+        # 否则会导致向量维度不匹配，影响向量数据库的创建和搜索功能
+      search:
+        top_k: 20
+        score_threshold: 0.7
+        rerank_top_k: 10
+        max_candidates: 100
+      cache:
+        ttl_seconds: 3600
+        max_size: 1000
+        enable_cache: true
+      processing:
+        batch_size: 100
+        max_description_length: 500
+        auto_generate_description: true
+    # 向量服务配置
+    vector:
+      default_provider: "openai"  # 与RAG使用相同的提供商
+      default_dimension: 100     # 与RAG.embedding.dimensions保持一致
+      dimension: 100
+      similarity_threshold: 0.8
+      providers:
+        gemini:
+          api_key: "${GEMINI_API_KEY}"
+          model: "models/embedding-001"
+        openai:
+          api_key: "${OPENAI_API_KEY}"
+          model: "text-embedding-ada-002"  # 与RAG.embedding.model保持一致
+          dimensions: 100                 # 与RAG.embedding.dimensions保持一致
+        aliyun:
+          api_key: "${ALIYUN_API_KEY}"
+          model: "text-embedding-v4"
+          dimensions: 1024
+        local:
+          model: "all-MiniLM-L6-v2"
+          dimensions: 384
+    # 默认管理员账户配置
+    admin:
+      username: "admin"
+      password: "${ADMIN_PASSWORD}"
+      email: "admin@example.com"
+      name: "超级管理员"
+    # API服务配置
+    api:
+      host: "0.0.0.0"
+      port: 8000
+      cors_origins:
+        - "http://localhost:5173"
+        - "http://127.0.0.1:5173"
+    # JWT认证配置
+    jwt:
+      secret_key: "${JWT_SECRET_KEY}"
+      algorithm: "HS256"
+      access_token_expire_minutes: 30
+    # 缓存配置
+    cache:
+      ttl: 900  # 15分钟，单位秒
+    # 上传配置
+    upload:
+      max_size: 10485760  # 10MB，单位字节
+# 测试环境
+testing:
+  # 模块配置
+  modules:
+    # 数据库配置
+    database:
+      type: sqlite
+      sqlite:
+        url: sqlite:///./test_bookstore.db
+      mysql:
+        host: localhost
+        port: 3306
+        database: test_bookstore
+        user: bookstore
+        password: "${MYSQL_PASSWORD}"
+        charset: utf8mb4
+    # LLM服务配置
+    llm:
+      default_service: "gemini"
+      service_priority: ["gemini", "qwen", "ernie", "zhipu", "openai", "mock"]
+      providers:
+        # OpenAI配置
+        openai:
+          api_key: "${OPENAI_API_KEY}"
+          model: "gpt-3.5-turbo"
+          temperature: 0.7
+          max_tokens: 2000
+          base_url: "https://api.openai.com/v1"
+        # Google Gemini配置
+        gemini:
+          api_key: "${GEMINI_API_KEY}"
+          model: "gemini-pro"
+          temperature: 0.7
+          max_output_tokens: 2000
+        # 通义千问配置 (阿里云)
+        qwen:
+          api_key: "${QWEN_API_KEY}"
+          model: "qwen-turbo"
+          temperature: 0.7
+          max_tokens: 2000
+          base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        # 文心一言配置 (百度)
+        ernie:
+          api_key: "${ERNIE_API_KEY}"
+          secret_key: "${ERNIE_SECRET_KEY}"
+          model: "ERNIE-Bot-turbo"
+          temperature: 0.7
+        # 智谱GLM配置 (智谱AI)
+        zhipu:
+          api_key: "${ZHIPU_API_KEY}"
+          model: "glm-4"
+          temperature: 0.7
+          max_tokens: 2000
+          base_url: "https://open.bigmodel.cn/api/paas/v4"
+        # 本地LLM配置 (Ollama等)
+        local:
+          base_url: "http://localhost:11434"
+          model: "llama2"
+          temperature: 0.7
+    # RAG服务配置
+    # 以下配置对应 app/services/rag_config.py 中的配置
+    # 注意：部分配置项仍在代码中有硬编码默认值，这里提供配置覆盖
+    rag:
+      vector_db:
+        type: qdrant
+        path: "./test_vector_db"
+        # 以下配置项用于 rag_config.py 中的 vector_db 配置
+        collection: "bookstore"  # 向量数据库集合名称
+        timeout: 30              # 连接超时时间（秒）
+      embedding:
+        model: "text-embedding-ada-002"
+        dimensions: 100
+        # 以下配置项用于 rag_config.py 中的 embedding_model 配置
+        max_length: 512           # 最大文本长度
+        device: "cpu"             # 运行设备（cpu/cuda/mps）
+      # RAG搜索参数（对应 rag_config.py 中的 search_params）
+      search:
+        top_k: 20                    # 向量搜索返回的top数量
+        score_threshold: 0.7          # 相似度阈值（0-1）
+        rerank_top_k: 10             # 重排序后返回的top数量
+        max_candidates: 100           # 候选集最大数量
+      # RAG缓存配置（对应 rag_config.py 中的 cache_config）
+      cache:
+        ttl_seconds: 3600            # 缓存TTL，单位秒
+        max_size: 1000               # 缓存最大条目数
+        enable_cache: true            # 是否启用缓存
+      # 书籍处理配置（对应 rag_config.py 中的 book_processing）
+      processing:
+        batch_size: 100              # 批量处理大小
+        max_description_length: 500   # 描述最大长度
+        auto_generate_description: true # 是否自动生成描述
+    # 向量服务配置
+    vector:
+      default_provider: "openai"
+      default_dimension: 100
+      dimension: 100
+      similarity_threshold: 0.8
+      providers:
+        gemini:
+          api_key: "${GEMINI_API_KEY}"
+          model: "models/embedding-001"
+        openai:
+          api_key: "${OPENAI_API_KEY}"
+          model: "text-embedding-ada-002"
+          dimensions: 100
+        aliyun:
+          api_key: "${ALIYUN_API_KEY}"
+          model: "text-embedding-v4"
+          dimensions: 1024
+        local:
+          model: "all-MiniLM-L6-v2"
+          dimensions: 384
+    # 默认管理员账户配置
+    admin:
+      username: "admin"
+      password: "${ADMIN_PASSWORD}"
+      email: "admin@example.com"
+      name: "超级管理员"
+    # API服务配置
+    api:
+      host: "0.0.0.0"
+      port: 8000
+      cors_origins:
+        - "http://localhost:5173"
+        - "http://127.0.0.1:5173"
+    # JWT认证配置
+    jwt:
+      secret_key: "${JWT_SECRET_KEY}"
+      algorithm: "HS256"
+      access_token_expire_minutes: 30
+    # 缓存配置
+    cache:
+      ttl: 900  # 15分钟，单位秒
+    # 上传配置
+    upload:
+      max_size: 10485760  # 10MB，单位字节
+    # Word2Vec模型路径
+    word2vec:
+      model_path: "models/word2vec.model"
+
+# 生产环境
+production:
+  # 模块配置
+  modules:
+    # 数据库配置
+    database:
+      type: mysql
+      sqlite:
+        url: sqlite:///./bookstore.db
+      mysql:
+        host: localhost
+        port: 3306
+        database: bookstore
+        user: bookstore
+        password: "${MYSQL_PASSWORD}"
+        charset: utf8mb4
+    # LLM服务配置
+    llm:
+      default_service: "gemini"
+      service_priority: ["gemini", "qwen", "ernie", "zhipu", "openai", "mock"]
+      providers:
+        # OpenAI配置
+        openai:
+          api_key: "${OPENAI_API_KEY}"
+          model: "gpt-3.5-turbo"
+          temperature: 0.7
+          max_tokens: 2000
+          base_url: "https://api.openai.com/v1"
+        # Google Gemini配置
+        gemini:
+          api_key: "${GEMINI_API_KEY}"
+          model: "gemini-pro"
+          temperature: 0.7
+          max_output_tokens: 2000
+        # 通义千问配置 (阿里云)
+        qwen:
+          api_key: "${QWEN_API_KEY}"
+          model: "qwen-turbo"
+          temperature: 0.7
+          max_tokens: 2000
+          base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        # 文心一言配置 (百度)
+        ernie:
+          api_key: "${ERNIE_API_KEY}"
+          secret_key: "${ERNIE_SECRET_KEY}"
+          model: "ERNIE-Bot-turbo"
+          temperature: 0.7
+        # 智谱GLM配置 (智谱AI)
+        zhipu:
+          api_key: "${ZHIPU_API_KEY}"
+          model: "glm-4"
+          temperature: 0.7
+          max_tokens: 2000
+          base_url: "https://open.bigmodel.cn/api/paas/v4"
+        # 本地LLM配置 (Ollama等)
+        local:
+          base_url: "http://localhost:11434"
+          model: "llama2"
+          temperature: 0.7
+    # RAG服务配置
+    rag:
+      vector_db:
+        type: qdrant
+        collection: "bookstore"
+        path: "./vector_db"
+        timeout: 30
+      embedding:
+        model: "text-embedding-ada-002"
+        dimensions: 100
+        max_length: 512
+        device: "cpu"
+      search:
+        top_k: 20
+        score_threshold: 0.7
+        rerank_top_k: 10
+        max_candidates: 100
+      cache:
+        ttl_seconds: 3600
+        max_size: 1000
+        enable_cache: true
+      processing:
+        batch_size: 100
+        max_description_length: 500
+        auto_generate_description: true
+    # 向量服务配置
+    vector:
+      default_provider: "openai"
+      default_dimension: 100
+      dimension: 100
+      similarity_threshold: 0.8
+      providers:
+        gemini:
+          api_key: "${GEMINI_API_KEY}"
+          model: "models/embedding-001"
+        openai:
+          api_key: "${OPENAI_API_KEY}"
+          model: "text-embedding-ada-002"
+          dimensions: 100
+        aliyun:
+          api_key: "${ALIYUN_API_KEY}"
+          model: "text-embedding-v4"
+          dimensions: 1024
+        local:
+          model: "all-MiniLM-L6-v2"
+          dimensions: 384
+    # 默认管理员账户配置
+    admin:
+      username: "admin"
+      password: "${ADMIN_PASSWORD}"
+      email: "admin@example.com"
+      name: "超级管理员"
+    # API服务配置
+    api:
+      host: "0.0.0.0"
+      port: 8000
+      cors_origins:
+        - "https://your-domain.com"
+        - "https://www.your-domain.com"
+    # JWT认证配置
+    jwt:
+      secret_key: "${JWT_SECRET_KEY}"
+      algorithm: "HS256"
+      access_token_expire_minutes: 30
+    # 缓存配置
+    cache:
+      ttl: 900  # 15分钟，单位秒
+    # 上传配置
+    upload:
+      max_size: 10485760  # 10MB，单位字节
+    # Word2Vec模型路径
+    word2vec:
+      model_path: "models/word2vec.model"
+
+# 免费部署环境
+free:
+  modules:
+    # 数据库配置
+    database:
+      type: sqlite
+      sqlite:
+        url: sqlite:////data/bookstore.db
+      mysql:
+        host: localhost
+        port: 3306
+        database: bookstore
+        user: root
+        password: ""
+        charset: utf8mb4
+    # LLM服务配置
+    llm:
+      default_service: "gemini"
+      service_priority: ["gemini", "qwen", "ernie", "zhipu", "openai", "mock"]
+      providers:
+        openai:
+          api_key: "${OPENAI_API_KEY}"
+          model: "gpt-3.5-turbo"
+          temperature: 0.7
+          max_tokens: 2000
+          base_url: "https://api.openai.com/v1"
+        gemini:
+          api_key: "${GEMINI_API_KEY}"
+          model: "gemini-pro"
+          temperature: 0.7
+          max_output_tokens: 2000
+        qwen:
+          api_key: "${QWEN_API_KEY}"
+          model: "qwen-turbo"
+          temperature: 0.7
+          max_tokens: 2000
+          base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        ernie:
+          api_key: "${ERNIE_API_KEY}"
+          secret_key: "${ERNIE_SECRET_KEY}"
+          model: "ERNIE-Bot-turbo"
+          temperature: 0.7
+        zhipu:
+          api_key: "${ZHIPU_API_KEY}"
+          model: "glm-4"
+          temperature: 0.7
+          max_tokens: 2000
+          base_url: "https://open.bigmodel.cn/api/paas/v4"
+        local:
+          base_url: "http://localhost:11434"
+          model: "llama2"
+          temperature: 0.7
+    # RAG服务配置
+    rag:
+      vector_db:
+        type: local
+        collection: "bookstore"
+        path: "./vector_db"
+        timeout: 30
+      embedding:
+        model: "text-embedding-ada-002"
+        dimensions: 100
+        max_length: 512
+        device: "cpu"
+      search:
+        top_k: 20
+        score_threshold: 0.7
+        rerank_top_k: 10
+        max_candidates: 100
+      cache:
+        ttl_seconds: 3600
+        max_size: 1000
+        enable_cache: true
+      processing:
+        batch_size: 100
+        max_description_length: 500
+        auto_generate_description: true
+    # 向量服务配置
+    vector:
+      type: local
+      default_provider: "local"
+      default_dimension: 100
+      dimension: 100
+      dimensions: 100
+      similarity_threshold: 0.8
+      url: "lancedb://./.lancedb"
+      providers:
+        gemini:
+          api_key: "${GEMINI_API_KEY}"
+          model: "models/embedding-001"
+        openai:
+          api_key: "${OPENAI_API_KEY}"
+          model: "text-embedding-ada-002"
+          dimensions: 100
+        aliyun:
+          api_key: "${ALIYUN_API_KEY}"
+          model: "text-embedding-v4"
+          dimensions: 1024
+        local:
+          model: "all-MiniLM-L6-v2"
+          dimensions: 384
+    admin:
+      username: "admin"
+      password: "${ADMIN_PASSWORD}"
+      email: "admin@example.com"
+      name: "超级管理员"
+    api:
+      host: "0.0.0.0"
+      port: 8000
+      cors_origins:
+        - "http://localhost:5173"
+        - "http://127.0.0.1:5173"
+    jwt:
+      secret_key: "${JWT_SECRET_KEY}"
+      algorithm: "HS256"
+      access_token_expire_minutes: 30
+    cache:
+      ttl: 900
+      url: ""
+    upload:
+      max_size: 10485760
+    word2vec:
+      model_path: "models/word2vec.model"
+
+free_cloud:
+  modules:
+    database:
+      type: sqlite
+      sqlite:
+        url: "sqlite:////data/bookstore.db"
+      mysql:
+        host: "${DB_HOST}"
+        port: 3306
+        database: "${DB_NAME}"
+        user: "${DB_USER}"
+        password: "${DB_PASSWORD}"
+        charset: utf8mb4
+    llm:
+      default_service: "gemini"
+      service_priority: ["gemini", "qwen", "ernie", "zhipu", "openai", "mock"]
+      providers:
+        openai:
+          api_key: "${OPENAI_API_KEY}"
+          model: "gpt-3.5-turbo"
+          temperature: 0.7
+          max_tokens: 2000
+          base_url: "https://api.openai.com/v1"
+        gemini:
+          api_key: "${GEMINI_API_KEY}"
+          model: "gemini-pro"
+          temperature: 0.7
+          max_output_tokens: 2000
+        qwen:
+          api_key: "${QWEN_API_KEY}"
+          model: "qwen-turbo"
+          temperature: 0.7
+          max_tokens: 2000
+          base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        ernie:
+          api_key: "${ERNIE_API_KEY}"
+          secret_key: "${ERNIE_SECRET_KEY}"
+          model: "ERNIE-Bot-turbo"
+          temperature: 0.7
+        zhipu:
+          api_key: "${ZHIPU_API_KEY}"
+          model: "glm-4"
+          temperature: 0.7
+          max_tokens: 2000
+          base_url: "https://open.bigmodel.cn/api/paas/v4"
+        local:
+          base_url: "http://localhost:11434"
+          model: "llama2"
+          temperature: 0.7
+    rag:
+      vector_db:
+        type: qdrant
+        collection: "bookstore"
+        host: "${QDRANT_HOST}"
+        port: 6333
+        url: "${QDRANT_URL}"
+        api_key: "${QDRANT_API_KEY}"
+        timeout: 30
+      embedding:
+        model: "text-embedding-ada-002"
+        dimensions: 100
+        max_length: 512
+        device: "cpu"
+      search:
+        top_k: 20
+        score_threshold: 0.7
+        rerank_top_k: 10
+        max_candidates: 100
+      cache:
+        ttl_seconds: 3600
+        max_size: 1000
+        enable_cache: true
+      processing:
+        batch_size: 100
+        max_description_length: 500
+        auto_generate_description: true
+    vector:
+      type: qdrant
+      default_provider: "gemini"
+      default_dimension: 100
+      dimension: 100
+      dimensions: 100
+      similarity_threshold: 0.8
+      url: "${QDRANT_URL}"
+      api_key: "${QDRANT_API_KEY}"
+      providers:
+        gemini:
+          api_key: "${GEMINI_API_KEY}"
+          model: "models/embedding-001"
+        openai:
+          api_key: "${OPENAI_API_KEY}"
+          model: "text-embedding-ada-002"
+          dimensions: 100
+        aliyun:
+          api_key: "${ALIYUN_API_KEY}"
+          model: "text-embedding-v4"
+          dimensions: 1024
+        local:
+          model: "all-MiniLM-L6-v2"
+          dimensions: 384
+    admin:
+      username: "admin"
+      password: "${ADMIN_PASSWORD}"
+      email: "admin@example.com"
+      name: "超级管理员"
+    api:
+      host: "0.0.0.0"
+      port: 8000
+      cors_origins:
+        - "${CORS_ORIGINS}"
+    jwt:
+      secret_key: "${JWT_SECRET_KEY}"
+      algorithm: "HS256"
+      access_token_expire_minutes: 30
+    cache:
+      ttl: 900
+      url: "${UPSTASH_REDIS_URL}"
+    upload:
+      max_size: 10485760
+    word2vec:
+      model_path: "models/word2vec.model"

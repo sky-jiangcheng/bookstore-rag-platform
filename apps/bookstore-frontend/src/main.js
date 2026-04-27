@@ -1,0 +1,121 @@
+import { createApp } from 'vue'
+import { createPinia } from 'pinia'
+import 'element-plus/dist/index.css'
+import {
+  ElAlert,
+  ElAside,
+  ElAvatar,
+  ElButton,
+  ElCard,
+  ElCheckbox,
+  ElCheckboxGroup,
+  ElCol,
+  ElContainer,
+  ElDatePicker,
+  ElDescriptions,
+  ElDescriptionsItem,
+  ElDialog,
+  ElDivider,
+  ElDropdown,
+  ElDropdownItem,
+  ElDropdownMenu,
+  ElEmpty,
+  ElForm,
+  ElFormItem,
+  ElHeader,
+  ElIcon,
+  ElInput,
+  ElInputNumber,
+  ElMain,
+  ElMenu,
+  ElMenuItem,
+  ElOption,
+  ElPagination,
+  ElPopover,
+  ElProgress,
+  ElRate,
+  ElResult,
+  ElRow,
+  ElSelect,
+  ElSkeleton,
+  ElSpace,
+  ElStep,
+  ElSteps,
+  ElSubMenu,
+  ElSwitch,
+  ElTabPane,
+  ElTabs,
+  ElTable,
+  ElTableColumn,
+  ElTag,
+  ElTimeline,
+  ElTimelineItem,
+  ElTooltip,
+  ElUpload
+} from 'element-plus'
+import App from './App.vue'
+import router from './router'
+
+const app = createApp(App)
+
+app.use(createPinia())
+app.use(router)
+
+const elementComponents = [
+  ElAlert,
+  ElAside,
+  ElAvatar,
+  ElButton,
+  ElCard,
+  ElCheckbox,
+  ElCheckboxGroup,
+  ElCol,
+  ElContainer,
+  ElDatePicker,
+  ElDescriptions,
+  ElDescriptionsItem,
+  ElDialog,
+  ElDivider,
+  ElDropdown,
+  ElDropdownItem,
+  ElDropdownMenu,
+  ElEmpty,
+  ElForm,
+  ElFormItem,
+  ElHeader,
+  ElIcon,
+  ElInput,
+  ElInputNumber,
+  ElMain,
+  ElMenu,
+  ElMenuItem,
+  ElOption,
+  ElPagination,
+  ElPopover,
+  ElProgress,
+  ElRate,
+  ElResult,
+  ElRow,
+  ElSelect,
+  ElSkeleton,
+  ElSpace,
+  ElStep,
+  ElSteps,
+  ElSubMenu,
+  ElSwitch,
+  ElTabPane,
+  ElTabs,
+  ElTable,
+  ElTableColumn,
+  ElTag,
+  ElTimeline,
+  ElTimelineItem,
+  ElTooltip,
+  ElUpload
+]
+
+elementComponents.forEach((component) => {
+  app.component(component.name, component)
+})
+
+app.mount('#app')

@@ -1,0 +1,29 @@
+# AgentScope 配置文件
+# 复制此文件为 config.yaml 并填入实际的 API Keys
+
+model_configs:
+  # OpenAI 配置
+  - model_type: openai
+    model_name: gpt-4
+    api_key: "${OPENAI_API_KEY}"
+    temperature: 0.7
+    
+  # 阿里云 DashScope 配置（国内推荐）
+  - model_type: dashscope
+    model_name: qwen-max
+    api_key: "${DASHSCOPE_API_KEY}"
+    temperature: 0.7
+    
+  # 本地模型配置（如使用 vLLM）
+  - model_type: openai
+    model_name: local-model
+    api_key: "EMPTY"
+    base_url: "http://localhost:8000/v1"
+
+# 默认使用的模型
+default_model: gpt-4
+
+# 测试配置
+test_config:
+  use_mock: false  # 设置为 true 使用 mock 模型（无需 API key）
+  mock_response_file: "tests/mock_responses.json"

@@ -1,0 +1,37 @@
+FastAPI>=0.110.0
+uvicorn[standard]>=0.27.0
+sqlalchemy>=2.0.23
+pymysql==1.1.0
+redis==5.0.1
+pandas>=2.2.0
+openpyxl==3.1.2
+
+numpy==1.26.2
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart>=0.0.9
+qdrant-client>=1.7.1
+lancedb>=0.4.0
+pyarrow>=14.0.1
+# 代码规范工具
+black==23.11.0
+flake8==6.1.0
+isort==5.12.0
+mypy==1.7.1
+# 可观测性依赖
+structlog>=24.1.0
+prometheus-client>=0.19.0
+jaeger-client>=4.8.0
+opentelemetry-api>=1.20.0
+opentelemetry-sdk>=1.20.0
+opentelemetry-exporter-jaeger>=1.21.0
+opentelemetry-instrumentation-fastapi>=0.45b0
+opentelemetry-instrumentation-redis>=0.45b0
+opentelemetry-instrumentation-sqlalchemy>=0.45b0
+opentelemetry-instrumentation-requests>=0.45b0
+opentelemetry-instrumentation-httpx>=0.45b0
+# 异步任务
+celery>=5.3.0
+python-dotenv>=1.0.0
+PyYAML>=6.0
+google-genai>=1.0.0

@@ -1,0 +1,79 @@
+# 依赖文件
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# 前端依赖
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+
+# 前端环境文件
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+frontend/.env.development
+frontend/.env.production
+
+# 环境文件
+.env
+.env.local
+.env.*.local
+
+# 配置文件
+backend/config/config.yml
+
+# 日志文件
+logs/
+*.log
+
+# IDE文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+
+# 测试文件
+.pytest_cache/
+coverage/
+
+# 临时文件
+tmp/
+temp/
+output/
+
+# Docker文件
+.dockerignore
+
+# 其他
+.DS_Store
+Thumbs.db
+
+# 临时目录和文件
+.wucai/
+*.csv
+*.docx
+
+# Claude Code 配置文件
+.claude/
+
+# 备份文件
+*.backup
+*.bak
+
+.pytest_cache/
+coverage/
+!**/tests/test_*.py
+带图书简介书目.xlsx
