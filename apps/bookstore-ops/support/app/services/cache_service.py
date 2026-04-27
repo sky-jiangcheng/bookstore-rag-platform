@@ -409,15 +409,17 @@ class AgentCache:
         return self.memory_cache[key]
 
     async def _get_from_redis(self, key: str) -> Any:
-        """从 Redis 获取"""
+        """从 Redis 获取（使用安全的 JSON 序列化）"""
         if not self.redis:
             return None
 
         try:
-            import pickle
             data = await self.redis.get(key)
             if data:
-                return pickle.loads(data)
+                # 使用 JSON 替代 pickle，避免远程代码执行风险
+                return json.loads(data)
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.error(f"Redis get decode error: {e}")
         except Exception as e:
             logger.error(f"Redis get error: {e}")
 
@@ -446,14 +448,16 @@ class AgentCache:
         self.memory_cache_ttl[key] = time.time() + ttl
 
     async def _set_to_redis(self, key: str, value: Any, ttl: int):
-        """存入 Redis"""
+        """存入 Redis（使用安全的 JSON 序列化）"""
         if not self.redis:
             return
 
         try:
-            import pickle
-            serialized = pickle.dumps(value)
+            # 使用 JSON 替代 pickle，避免远程代码执行风险
+            serialized = json.dumps(value, default=str)
             await self.redis.setex(key, ttl, serialized)
+        except (TypeError, ValueError) as e:
+            logger.error(f"Redis set serialize error: {e}")
         except Exception as e:
             logger.error(f"Redis set error: {e}")
 

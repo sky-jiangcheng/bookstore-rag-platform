@@ -77,6 +77,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(jwt_config.get("access_token_expire_minutes", 
 # 安全检查：SECRET_KEY 不能为空
 import os
 import sys
+import secrets
 
 # 允许通过环境变量覆盖配置文件中的 SECRET_KEY
 SECRET_KEY = os.environ.get("SECRET_KEY", SECRET_KEY)
@@ -89,9 +90,10 @@ if not SECRET_KEY:
         print("Set it via config.yml (jwt.secret_key) or environment variable SECRET_KEY", file=sys.stderr)
         sys.exit(1)
     else:
-        # 开发环境使用默认密钥（不安全，仅用于开发）
-        SECRET_KEY = "dev-secret-key-change-in-production"
-        print("WARNING: Using default SECRET_KEY for development. This is NOT secure for production!", file=sys.stderr)
+        # 开发环境生成随机密钥（每次启动不同，更安全）
+        SECRET_KEY = secrets.token_urlsafe(32)
+        print("WARNING: Using auto-generated SECRET_KEY for development.", file=sys.stderr)
+        print("For production, set SECRET_KEY in config.yml or environment variable.", file=sys.stderr)
 
 # 上传配置
 upload_config = config_loader.get_upload_config()
