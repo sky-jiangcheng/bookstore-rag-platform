@@ -25,7 +25,7 @@ services:
 
   gateway:
     build:
-      context: ../../../store-gateway
+      context: ../../bookstore-gateway
       dockerfile: Dockerfile
     container_name: bookstore-gateway
     ports:
@@ -66,7 +66,7 @@ services:
 
   auth:
     build:
-      context: ../../../store-auth
+      context: ../../bookstore-auth
       dockerfile: Dockerfile
     container_name: bookstore-auth
     ports:
@@ -101,7 +101,7 @@ services:
 
   rag:
     build:
-      context: ../../../store-rag
+      context: ../../bookstore-rag
       dockerfile: Dockerfile
     container_name: bookstore-rag
     ports:
@@ -133,7 +133,7 @@ services:
 
   catalog:
     build:
-      context: ../../../store-catalog
+      context: ../../bookstore-catalog
       dockerfile: Dockerfile
     container_name: bookstore-catalog
     ports:
@@ -168,7 +168,7 @@ services:
 
   ops:
     build:
-      context: ../../../store-ops
+      context: ../../bookstore-ops
       dockerfile: Dockerfile
     container_name: bookstore-ops
     ports:
@@ -203,7 +203,7 @@ services:
 
   frontend:
     build:
-      context: ../../../store-frontend
+      context: ../../bookstore-frontend
       dockerfile: Dockerfile
     container_name: bookstore-frontend
     ports:

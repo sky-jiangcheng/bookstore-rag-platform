@@ -397,21 +397,44 @@ class ConfigLoader:
 
     def get_jwt_config(self):
         """获取JWT认证配置"""
+        import secrets
+        import sys
+
         modules_config = self.get_modules_config()
         config = modules_config.get(
             "jwt",
             {
-                "secret_key": "your-secret-key-here-change-in-production",
+                "secret_key": "",
                 "algorithm": "HS256",
                 "access_token_expire_minutes": 30,
             },
         )
 
-        # 从环境变量覆盖JWT密钥
+        # 从环境变量覆盖JWT密钥（优先级最高）
         if self._use_env_overrides():
             secret_key = os.getenv("JWT_SECRET_KEY", "")
             if secret_key:
                 config["secret_key"] = secret_key
+
+        # 安全检查：不允许使用默认占位密钥或空密钥
+        placeholder = "your-secret-key-here-change-in-production"
+        current_key = config.get("secret_key", "")
+        if not current_key or current_key == placeholder:
+            env = self.env.lower()
+            if env in ("production", "prod", "staging"):
+                logger.error(
+                    "JWT_SECRET_KEY 未配置或仍为默认占位值，生产环境禁止启动！"
+                    " 请通过环境变量 JWT_SECRET_KEY 设置强密钥。"
+                )
+                sys.exit(1)
+            else:
+                # 开发/测试环境自动生成随机密钥，并输出警告
+                auto_key = secrets.token_urlsafe(32)
+                config["secret_key"] = auto_key
+                logger.warning(
+                    "JWT_SECRET_KEY 未配置，已为当前会话自动生成随机密钥。"
+                    " 重启后令牌将失效，生产部署前请设置环境变量 JWT_SECRET_KEY。"
+                )
 
         return config
 

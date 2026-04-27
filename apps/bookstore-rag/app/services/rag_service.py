@@ -576,39 +576,6 @@ class RAGService(RAGServiceInterface):
             for i, rec in enumerate(recommendations):
                 logger.info(f"Recommendation {i+1}: {rec['title']}")
 
-            # 直接创建测试推荐结果
-            if not recommendations:
-                logger.info(
-                    "Step 3: Creating test recommendations since no books found"
-                )
-                # 直接创建测试数据
-                test_recommendations = [
-                    {
-                        "book_id": 1,
-                        "title": "Python编程从入门到精通",
-                        "author": "张三",
-                        "publisher": "清华大学出版社",
-                        "summary": "本书详细介绍了Python编程的基础知识和高级技巧，适合初学者和有一定基础的开发者阅读。内容包括Python语法、面向对象编程、数据分析、Web开发等方面。",
-                        "price": 89.0,
-                        "stock": 100,
-                        "score": 0.95,
-                        "source": "test",
-                    },
-                    {
-                        "book_id": 2,
-                        "title": "Python数据分析与可视化",
-                        "author": "李四",
-                        "publisher": "北京大学出版社",
-                        "summary": "本书介绍了使用Python进行数据分析和可视化的方法，包括NumPy、Pandas、Matplotlib等库的使用，以及数据清洗、处理、分析和可视化的完整流程。",
-                        "price": 79.0,
-                        "stock": 95,
-                        "score": 0.9,
-                        "source": "test",
-                    },
-                ]
-                recommendations = test_recommendations
-                logger.info(f"Added {len(recommendations)} test recommendations")
-
             # 生成推荐理由
             logger.info("Step 4: Generating recommendation reason")
             if self.gemini_service and hasattr(self.gemini_service, "generate_recommendation_reason"):

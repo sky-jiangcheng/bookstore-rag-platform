@@ -24,6 +24,9 @@ class PermissionService:
     @staticmethod
     def _degraded_auth_enabled() -> bool:
         app_env = os.getenv("APP_ENV", "development").lower()
+        # 生产/预发布环境强制禁用
+        if app_env in ("production", "prod", "staging"):
+            return False
         flag = os.getenv("BOOKSTORE_DEGRADED_AUTH", "").lower() in {"1", "true", "yes"}
         return app_env == "testing" or flag
 

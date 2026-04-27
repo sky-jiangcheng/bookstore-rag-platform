@@ -44,24 +44,29 @@ class PermissionService:
     @staticmethod
     def get_user_permissions(user_id: int) -> List[Permission]:
         """获取用户的所有权限"""
-        db = next(get_db())
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            return []
+        db = None
+        try:
+            db = next(get_db())
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                return []
 
-        permissions = []
-        for role in user.roles:
-            permissions.extend(role.permissions)
+            permissions = []
+            for role in user.roles:
+                permissions.extend(role.permissions)
 
-        # 去重
-        unique_permissions = []
-        seen_codes = set()
-        for perm in permissions:
-            if perm.code not in seen_codes:
-                seen_codes.add(perm.code)
-                unique_permissions.append(perm)
+            # 去重
+            unique_permissions = []
+            seen_codes = set()
+            for perm in permissions:
+                if perm.code not in seen_codes:
+                    seen_codes.add(perm.code)
+                    unique_permissions.append(perm)
 
-        return unique_permissions
+            return unique_permissions
+        finally:
+            if db:
+                db.close()
 
     @staticmethod
     def check_permission(user_id: Any, permission_code: str) -> bool:
@@ -81,12 +86,17 @@ class PermissionService:
             return True
 
         # 检查用户是否是超级管理员
-        db = next(get_db())
-        user = db.query(User).filter(User.id == user_id).first()
-        if user:
-            for role in user.roles:
-                if role.code == "SUPER_ADMIN":
-                    return True
+        db = None
+        try:
+            db = next(get_db())
+            user = db.query(User).filter(User.id == user_id).first()
+            if user:
+                for role in user.roles:
+                    if role.code == "SUPER_ADMIN":
+                        return True
+        finally:
+            if db:
+                db.close()
 
         return False
 
@@ -111,12 +121,17 @@ class PermissionService:
                 return True
 
         # 检查用户是否是超级管理员
-        db = next(get_db())
-        user = db.query(User).filter(User.id == user_id).first()
-        if user:
-            for role in user.roles:
-                if role.code == "SUPER_ADMIN":
-                    return True
+        db = None
+        try:
+            db = next(get_db())
+            user = db.query(User).filter(User.id == user_id).first()
+            if user:
+                for role in user.roles:
+                    if role.code == "SUPER_ADMIN":
+                        return True
+        finally:
+            if db:
+                db.close()
 
         return False
 
@@ -133,12 +148,16 @@ class PermissionService:
         if isinstance(user_id, int) is False and hasattr(user_id, "id"):
             user_id = user_id.id
 
-        db = next(get_db())
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            return []
-
-        return user.roles
+        db = None
+        try:
+            db = next(get_db())
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                return []
+            return user.roles
+        finally:
+            if db:
+                db.close()
 
     @staticmethod
     def check_role(user_id: Any, role_code: str) -> bool:

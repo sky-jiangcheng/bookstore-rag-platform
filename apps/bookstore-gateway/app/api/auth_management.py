@@ -26,11 +26,21 @@ def get_token_from_header(authorization: str = None) -> str:
 def _degraded_auth_enabled() -> bool:
     """是否启用降级认证。
 
-    仅在测试/开发显式开启时使用，避免影响生产环境。
+    仅在测试/开发显式开启时使用，**生产/staging 环境永远返回 False**。
     """
     app_env = os.getenv("APP_ENV", "development").lower()
+    # 生产/预发布环境强制禁用
+    if app_env in ("production", "prod", "staging"):
+        return False
     flag = os.getenv("BOOKSTORE_DEGRADED_AUTH", "").lower() in {"1", "true", "yes"}
-    return app_env == "testing" or flag
+    enabled = app_env == "testing" or flag
+    if enabled:
+        import logging
+        logging.getLogger(__name__).warning(
+            "⚠️  降级认证已启用（BOOKSTORE_DEGRADED_AUTH=true），"
+            "所有请求将以超级管理员身份通过认证！请勿在生产环境使用！"
+        )
+    return enabled
 
 
 def _build_test_user() -> SimpleNamespace:
