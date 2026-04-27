@@ -2,8 +2,11 @@ FROM node:18-alpine AS frontend-build
 
 WORKDIR /app
 
+# 安装构建依赖
+RUN apk add --no-cache python3 make g++
+
 COPY apps/bookstore-frontend/package*.json ./apps/bookstore-frontend/
-RUN cd apps/bookstore-frontend && npm ci
+RUN cd apps/bookstore-frontend && npm ci --legacy-peer-deps
 
 COPY apps/bookstore-frontend ./apps/bookstore-frontend
 RUN cd apps/bookstore-frontend && npm run build
