@@ -554,6 +554,12 @@ free_cloud:
       type: sqlite
       sqlite:
         url: "sqlite:////data/bookstore.db"
+      postgresql:
+        host: "${DB_HOST}"
+        port: 5432
+        database: "${DB_NAME}"
+        user: "${DB_USER}"
+        password: "${DB_PASSWORD}"
       mysql:
         host: "${DB_HOST}"
         port: 3306

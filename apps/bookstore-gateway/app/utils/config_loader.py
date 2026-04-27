@@ -209,6 +209,18 @@ class ConfigLoader:
                 return f"mysql+pymysql://{user}:{password}@{host}:{port}/{database}?charset={charset}"
             else:
                 return f"mysql+pymysql://{user}@{host}:{port}/{database}?charset={charset}"
+        elif db_type == "postgresql":
+            pg_config = config.get("postgresql", {})
+            user = pg_config.get('user', 'postgres')
+            password = pg_config.get('password', '')
+            host = pg_config.get('host', 'localhost')
+            port = pg_config.get('port', 5432)
+            database = pg_config.get('database', 'bookstore')
+            
+            if password:
+                return f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{database}"
+            else:
+                return f"postgresql+psycopg2://{user}@{host}:{port}/{database}"
         else:
             raise ValueError(f"不支持的数据库类型: {db_type}")
 
