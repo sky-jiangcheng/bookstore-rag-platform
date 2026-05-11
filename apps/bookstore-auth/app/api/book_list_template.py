@@ -1,7 +1,7 @@
 """
 书单模板管理API
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
@@ -241,7 +241,7 @@ async def update_template(
         template.parsed_requirements = request.parsed_requirements
         template.is_public = request.is_public
         template.tags = request.tags
-        template.updated_at = datetime.utcnow()
+        template.updated_at = datetime.now(timezone.utc)
 
         db.commit()
         db.refresh(template)
@@ -284,7 +284,7 @@ async def delete_template(
     try:
         # 软删除
         template.is_active = False
-        template.updated_at = datetime.utcnow()
+        template.updated_at = datetime.now(timezone.utc)
 
         db.commit()
 

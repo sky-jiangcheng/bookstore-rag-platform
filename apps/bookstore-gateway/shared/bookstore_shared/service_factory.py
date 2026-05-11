@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -123,8 +124,14 @@ def create_service_app(service_name: str = "gateway") -> FastAPI:
     )
 
     route_specs = SERVICE_ROUTES.get(normalized, SERVICE_ROUTES["gateway"])
+    _app_env = os.getenv("APP_ENV", "development").lower()
+    _safe_envs = {"development", "testing"}
 
     for spec in route_specs:
+        # 仅在开发/测试环境下注册 testing 路由
+        if "testing" in spec.module_path and _app_env not in _safe_envs:
+            logger.warning(f"Skipping testing route '{spec.module_path}' in {_app_env} environment")
+            continue
         router = _import_router(spec.module_path)
         include_kwargs = {}
         if spec.prefix:
@@ -139,7 +146,9 @@ def create_service_app(service_name: str = "gateway") -> FastAPI:
         status = "healthy" if app.state.database_ready or not requires_bootstrap else "degraded"
         return {"status": status, "service": normalized}
 
-    frontend_dist = Path(__file__).resolve().parents[4] / "apps" / "bookstore-frontend" / "dist"
+    # 使用环境变量或基于 __file__ 的可靠路径计算确定项目根目录
+    project_root = Path(os.getenv("PROJECT_ROOT", str(Path(__file__).resolve().parents[4])))
+    frontend_dist = project_root / "apps" / "bookstore-frontend" / "dist"
     if normalized == "platform" and frontend_dist.exists():
         assets_dir = frontend_dist / "assets"
         if assets_dir.exists():

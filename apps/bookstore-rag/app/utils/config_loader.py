@@ -406,7 +406,7 @@ class ConfigLoader:
         current_key = config.get("secret_key", "")
         if not current_key or current_key == placeholder:
             env = self.env.lower()
-            if env in ("production", "prod", "staging"):
+            if env in ("production", "prod", "staging", "free_cloud"):
                 logger.error(
                     "JWT_SECRET_KEY 未配置或仍为默认占位值，生产环境禁止启动！"
                     " 请通过环境变量 JWT_SECRET_KEY 设置强密钥。"

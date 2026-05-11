@@ -29,8 +29,8 @@ def _degraded_auth_enabled() -> bool:
     仅在测试/开发显式开启时使用，**生产/staging 环境永远返回 False**。
     """
     app_env = os.getenv("APP_ENV", "development").lower()
-    # 生产/预发布环境强制禁用
-    if app_env in ("production", "prod", "staging"):
+    # 生产/预发布/free_cloud环境强制禁用
+    if app_env in ("production", "prod", "staging", "free_cloud"):
         return False
     flag = os.getenv("BOOKSTORE_DEGRADED_AUTH", "").lower() in {"1", "true", "yes"}
     enabled = app_env == "testing" or flag

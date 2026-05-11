@@ -23,6 +23,11 @@ router.include_router(book_list_feedback.router, tags=["书单满意度反馈"])
 router.include_router(demand_analysis.router, tags=["需求解析"])
 router.include_router(batch_search.router, prefix="/api/v1/search", tags=["批量搜索"])
 router.include_router(agent_api.router)
-router.include_router(testing.router)
 router.include_router(utilities.router, tags=["书单管理辅助接口"])
 router.include_router(book_filter_management.router, prefix="/api/v1", tags=["图书筛选管理"])
+
+# 仅在 development/testing 环境下注册测试路由
+import os
+_app_env = os.getenv("APP_ENV", "development").lower()
+if _app_env in ("development", "testing"):
+    router.include_router(testing.router)
