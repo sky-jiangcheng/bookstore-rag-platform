@@ -155,9 +155,9 @@ async def get_task_statistics(
     Returns:
         统计信息
     """
-    # 权限检查（可选）
-    # if current_user.role != "admin":
-    #     raise HTTPException(status_code=403, detail="需要管理员权限")
+    # 权限检查
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="需要管理员权限")
 
     task_manager = get_task_manager()
     stats = task_manager.get_statistics()
@@ -179,9 +179,9 @@ async def cleanup_old_tasks(
     Returns:
         清理结果
     """
-    # 权限检查（可选）
-    # if current_user.role != "admin":
-    #     raise HTTPException(status_code=403, detail="需要管理员权限")
+    # 权限检查
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="需要管理员权限")
 
     task_manager = get_task_manager()
     cleaned = task_manager.cleanup_old_tasks(max_age_hours)

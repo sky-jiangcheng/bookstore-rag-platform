@@ -66,13 +66,28 @@ async def upload_file(
                     total_failure_count += 1
                     continue
 
-                # 读取文件内容
+                # 文件名净化：防止路径遍历攻击
+                safe_filename = os.path.basename(file.filename)
+                if safe_filename != file.filename:
+                    logger.warning(
+                        f"Sanitized filename: '{file.filename}' -> '{safe_filename}'"
+                    )
+
+                # 文件大小限制检查（200MB）
                 content = await file.read()
                 file_size = len(content)
+                max_file_size = 200 * 1024 * 1024
+                if file_size > max_file_size:
+                    logger.error(
+                        f"File too large: {file_size} bytes > {max_file_size}"
+                    )
+                    raise HTTPException(
+                        status_code=413, detail="文件大小超过限制（200MB）"
+                    )
 
                 # 保存临时文件
                 with tempfile.NamedTemporaryFile(
-                    delete=False, suffix=os.path.splitext(file.filename)[1]
+                    delete=False, suffix=os.path.splitext(safe_filename)[1]
                 ) as temp_file:
                     temp_file.write(content)
                     temp_file_path = temp_file.name
@@ -80,15 +95,15 @@ async def upload_file(
                 # 确定文件类型
                 file_type = (
                     "CSV"
-                    if file.filename.endswith(".csv")
+                    if safe_filename.endswith(".csv")
                     else "EXCEL"
-                    if file.filename.endswith(".xlsx")
+                    if safe_filename.endswith(".xlsx")
                     else "UNKNOWN"
                 )
 
                 # 创建导入记录
                 import_record = ImportRecord(
-                    filename=file.filename,
+                    filename=safe_filename,
                     file_size=file_size,
                     file_type=file_type,
                     status="PROCESSING",
@@ -98,16 +113,18 @@ async def upload_file(
                 import_id = import_record.id
                 import_records.append(import_id)
                 logger.info(
-                    f"Created import record with ID: {import_id} for file: {file.filename}"
+                    f"Created import record with ID: {import_id} for file: {safe_filename}"
                 )
 
                 # 读取文件
-                if file.filename.endswith(".csv"):
+                processed_barcodes = set()  # 用于跟踪已处理的条码，避免重复处理
+
+                if safe_filename.endswith(".csv"):
                     df = pd.read_csv(temp_file_path)
-                elif file.filename.endswith(".xlsx"):
+                elif safe_filename.endswith(".xlsx"):
                     df = pd.read_excel(temp_file_path)
                 else:
-                    logger.warning(f"Unsupported file format: {file.filename}")
+                    logger.warning(f"Unsupported file format: {safe_filename}")
                     raise HTTPException(
                         status_code=400, detail="Unsupported file format"
                     )
@@ -117,7 +134,6 @@ async def upload_file(
                 logger.info(f"Total rows: {len(df)}")
 
                 # 处理数据
-                processed_barcodes = set()  # 用于跟踪已处理的条码，避免重复处理
 
                 for index, row in df.iterrows():
                     row_success = False

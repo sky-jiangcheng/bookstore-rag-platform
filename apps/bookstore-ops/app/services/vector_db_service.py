@@ -31,26 +31,54 @@ class LocalVectorDB:
     def __init__(self):
         self.vectors = {}
         self.metadata = {}
-        logger.info("Using local in-memory vector database")
+        # 粗粒度索引：按前8维的符号位分桶（256个桶）
+        self._buckets: Dict[int, List[str]] = {i: [] for i in range(256)}
+        logger.info("Using local in-memory vector database with coarse index")
+
+    def _get_bucket_key(self, vec: List[float]) -> int:
+        """计算粗粒度桶键：前8维的符号位"""
+        key = 0
+        for i in range(min(8, len(vec))):
+            if vec[i] >= 0:
+                key |= (1 << i)
+        return key
 
     def add_book_vector(self, book_id: int, vector: List[float], metadata: Dict[str, Any]) -> bool:
         """添加书籍向量"""
         point_id = f"book_{book_id}"
         self.vectors[point_id] = vector
         self.metadata[point_id] = metadata
+        # 更新粗粒度索引
+        bucket = self._get_bucket_key(vector)
+        if bucket in self._buckets:
+            self._buckets[bucket].append(point_id)
         return True
 
     def update_book_vector(self, book_id: int, vector: List[float], metadata: Dict[str, Any]) -> bool:
         """更新书籍向量"""
         point_id = f"book_{book_id}"
+        if point_id in self.vectors:
+            # 从旧桶移除
+            old_vec = self.vectors[point_id]
+            old_bucket = self._get_bucket_key(old_vec)
+            if old_bucket in self._buckets and point_id in self._buckets[old_bucket]:
+                self._buckets[old_bucket].remove(point_id)
         self.vectors[point_id] = vector
         self.metadata[point_id] = metadata
+        # 加入新桶
+        new_bucket = self._get_bucket_key(vector)
+        if new_bucket in self._buckets:
+            self._buckets[new_bucket].append(point_id)
         return True
 
     def delete_book_vector(self, book_id: int) -> bool:
         """删除书籍向量"""
         point_id = f"book_{book_id}"
         if point_id in self.vectors:
+            old_vec = self.vectors[point_id]
+            old_bucket = self._get_bucket_key(old_vec)
+            if old_bucket in self._buckets and point_id in self._buckets[old_bucket]:
+                self._buckets[old_bucket].remove(point_id)
             del self.vectors[point_id]
             del self.metadata[point_id]
         return True
@@ -62,7 +90,19 @@ class LocalVectorDB:
         score_threshold: float = 0.7,
         filters: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
-        """搜索相似书籍"""
+        """搜索相似书籍（使用粗粒度索引预过滤）"""
+        # 计算查询向量的桶键
+        query_bucket = self._get_bucket_key(query_vector)
+
+        # 收集候选桶：查询桶 + 汉明距离≤1的相邻桶
+        candidate_ids = set(self._buckets.get(query_bucket, []))
+        for i in range(8):
+            neighbor_bucket = query_bucket ^ (1 << i)
+            candidate_ids.update(self._buckets.get(neighbor_bucket, []))
+
+        # 只对候选向量做精确相似度计算
+        candidate_vectors = {pid: self.vectors[pid] for pid in candidate_ids if pid in self.vectors}
+
         # 向量化的余弦相似度计算
         def cosine_similarity(query, vectors_dict):
             if not vectors_dict:
@@ -76,7 +116,7 @@ class LocalVectorDB:
             scores = dot_products / norms
             return dict(zip(point_ids, scores.tolist()))
 
-        scores = cosine_similarity(query_vector, self.vectors)
+        scores = cosine_similarity(query_vector, candidate_vectors)
         results = []
         for point_id, score in scores.items():
             if score >= score_threshold:

@@ -25,8 +25,13 @@ class EmbeddingService:
         self.model = None
         self.tokenizer = None
         self.device = self._get_device()
-        self._load_model()
         self.executor = ThreadPoolExecutor(max_workers=4)
+        self._loaded = False
+
+    def _ensure_loaded(self):
+        """确保模型已加载，若未加载则同步加载"""
+        if not self._loaded:
+            self._load_model()
 
     def _get_device(self) -> str:
         """获取设备类型"""
@@ -96,6 +101,7 @@ class EmbeddingService:
 
     def encode_text(self, text: str) -> List[float]:
         """编码单个文本"""
+        self._ensure_loaded()
         try:
             # 预处理
             cleaned_text = self.preprocess_text(text)
@@ -169,6 +175,7 @@ class EmbeddingService:
 
     def encode_batch(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
         """批量编码文本"""
+        self._ensure_loaded()
         try:
             # 预处理所有文本
             cleaned_texts = [self.preprocess_text(text) for text in texts]
@@ -207,6 +214,7 @@ class EmbeddingService:
         self, texts: List[str], max_workers: int = 4
     ) -> List[List[float]]:
         """并行编码文本"""
+        self._ensure_loaded()
         try:
             futures = []
             for text in texts:

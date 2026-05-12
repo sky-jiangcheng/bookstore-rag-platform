@@ -112,6 +112,26 @@ def create_service_app(service_name: str = "gateway") -> FastAPI:
         allow_headers=["*"],
     )
 
+    # 全局请求体大小限制（10MB）
+    @app.middleware("http")
+    async def limit_body_size(request: Request, call_next):
+        if request.method in ("POST", "PUT", "PATCH"):
+            content_length = request.headers.get("content-length")
+            if content_length and int(content_length) > 10 * 1024 * 1024:  # 10MB
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": "请求体过大，最大允许 10MB"},
+                )
+            # 如果没有 Content-Length，流式读取并截断（防止分块传输攻击）
+            if content_length is None and request.url.path not in ("/", "/health", "/docs", "/openapi.json", "/redoc"):
+                body = await request.body()
+                if len(body) > 10 * 1024 * 1024:
+                    return JSONResponse(
+                        status_code=413,
+                        content={"detail": "请求体过大，最大允许 10MB"},
+                    )
+        return await call_next(request)
+
     # 全局速率限制中间件
     @app.middleware("http")
     async def global_rate_limit(request: Request, call_next):

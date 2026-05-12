@@ -79,6 +79,15 @@ class RAGService(RAGServiceInterface):
         self.gemini_service = gemini_service
         self.llm_service = llm_service
 
+        # 嵌入缓存：避免重复的向量查询
+        self._embedding_cache: Dict[str, List[float]] = {}
+        # 解析缓存：相同用户输入避免重复解析
+        self._parse_cache: Dict[str, Dict[str, Any]] = {}
+        # 屏蔽关键词缓存：避免重复DB查询
+        self._blocked_keywords_cache: Dict[int, List[str]] = {}
+        self._blocked_keywords_cache_time = 0
+        self._blocked_keywords_ttl = 60  # 60秒缓存
+
         logger.info("RAGService initialized with injected dependencies")
 
     def filter_blocked_books(
@@ -130,10 +139,17 @@ class RAGService(RAGServiceInterface):
                 )
                 return books
 
-            # 获取所有激活的屏蔽关键词
-            blocked_keywords = (
-                db.query(FilterKeyword).filter(FilterKeyword.is_active == 1).all()
-            )
+            # 缓存屏蔽关键词，避免重复DB查询
+            import time
+            now = time.time()
+            if now - self._blocked_keywords_cache_time > self._blocked_keywords_ttl:
+                blocked_keywords = (
+                    db.query(FilterKeyword).filter(FilterKeyword.is_active == 1).all()
+                )
+                self._blocked_keywords_cache = {kw.keyword for kw in blocked_keywords}
+                self._blocked_keywords_cache_time = now
+                logger.info(f"Refreshed blocked keywords cache: {len(self._blocked_keywords_cache)} keywords")
+            blocked_keyword_set = self._blocked_keywords_cache
 
             blocked_keyword_list = [kw.keyword for kw in blocked_keywords]
             logger.info(f"Loaded {len(blocked_keyword_list)} blocked keywords")
@@ -185,6 +201,16 @@ class RAGService(RAGServiceInterface):
             解析后的需求信息
         """
         logger.info(f"Parsing user request: {user_input}")
+
+        # 解析缓存：相同输入在30秒内使用缓存结果
+        import time
+        now = time.time()
+        cached = self._parse_cache.get(user_input)
+        if cached and now - cached.get("_cached_at", 0) < 30:
+            logger.info(f"Using cached parse result for: {user_input[:50]}...")
+            result = dict(cached)
+            result.pop("_cached_at", None)
+            return result
 
         # 直接使用基于规则的解析，跳过LLM
         logger.info("Using rule-based parsing directly")

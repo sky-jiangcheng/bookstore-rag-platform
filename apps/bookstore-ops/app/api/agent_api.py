@@ -3,13 +3,16 @@ Agent API 路由
 提供 WebSocket 和 HTTP 接口用于智能书单生成
 """
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import json
 import asyncio
 import logging
+
+from app.api.auth_management import get_current_active_user
+from app.models.auth import User
 
 from ..agents.workflow import workflow_manager, BookListWorkflow
 
@@ -107,16 +110,22 @@ async def agent_websocket(websocket: WebSocket):
     await websocket.accept()
     workflow = None
     
-    # 获取认证 token（从查询参数）
+    # 强制认证：从查询参数获取 token
     token = websocket.query_params.get("token")
-    if token:
-        # 验证 token（如果需要）
-        from app.services.auth_service import AuthService
-        user = AuthService.get_current_user(token)
-        if user:
-            logger.info(f"WebSocket connected with user: {user.username}")
-        else:
-            logger.warning("WebSocket connected with invalid token")
+    if not token:
+        await websocket.send_json({"type": "error", "content": "缺少认证令牌"})
+        await websocket.close(code=4001)
+        return
+
+    # 验证 token
+    from app.services.auth_service import AuthService
+    user = AuthService.get_current_user(token)
+    if not user:
+        await websocket.send_json({"type": "error", "content": "无效的认证令牌"})
+        await websocket.close(code=4001)
+        return
+
+    logger.info(f"WebSocket connected with user: {user.username}")
     
     try:
         while True:
@@ -198,7 +207,7 @@ async def agent_health():
 
 
 @router.delete("/session/{session_id}")
-async def delete_session(session_id: str):
+async def delete_session(session_id: str, current_user: User = Depends(get_current_active_user)):
     """删除会话"""
     workflow_manager.remove_workflow(session_id)
     return {"success": True, "message": "会话已删除"}

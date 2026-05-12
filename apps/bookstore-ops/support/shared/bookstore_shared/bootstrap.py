@@ -75,8 +75,17 @@ def initialize_runtime(
     try:
         from app.services.vector_db_service import vector_db
 
-        vector_db.bootstrap_from_database()
+        # 在后台线程中引导向量库，不阻塞启动
+        def _bootstrap_vector_db():
+            try:
+                vector_db.bootstrap_from_database()
+            except Exception as exc:
+                logger.warning("Background vector DB bootstrap failed: %s", exc)
+
+        t = threading.Thread(target=_bootstrap_vector_db, daemon=True)
+        t.start()
+        logger.info("Background vector database bootstrap started")
     except Exception as exc:  # pragma: no cover - best effort startup init
-        logger.warning("Failed to bootstrap local vector database: %s", exc)
+        logger.warning("Failed to start background vector DB bootstrap: %s", exc)
 
     return database_ready

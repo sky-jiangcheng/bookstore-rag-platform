@@ -4,8 +4,10 @@
 """
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 
+from app.api.auth_management import get_current_active_user
+from app.models.auth import User
 from app.core.service_registry import get_service
 from app.services.llm_service import LLMService
 from app.services.rag_service import RAGService
@@ -15,7 +17,7 @@ router = APIRouter(prefix="/api/v1/testing", tags=["测试"])
 
 
 @router.get("/llm/providers")
-async def get_llm_providers():
+async def get_llm_providers(current_user: User = Depends(get_current_active_user)):
     """
     获取可用的LLM提供商列表
     """
@@ -28,7 +30,7 @@ async def get_llm_providers():
 
 
 @router.post("/llm/chat")
-async def llm_chat(messages: List[Dict[str, str]], provider: str = "mock", **kwargs):
+async def llm_chat(messages: List[Dict[str, str]], provider: str = "mock", current_user: User = Depends(get_current_active_user), **kwargs):
     """
     测试LLM聊天完成功能
 
@@ -49,7 +51,7 @@ async def llm_chat(messages: List[Dict[str, str]], provider: str = "mock", **kwa
 
 
 @router.post("/llm/parse")
-async def llm_parse(user_input: str):
+async def llm_parse(user_input: str, current_user: User = Depends(get_current_active_user)):
     """
     测试LLM解析用户请求功能
 
@@ -65,7 +67,7 @@ async def llm_parse(user_input: str):
 
 
 @router.post("/llm/classify")
-async def llm_classify(book_info: Dict[str, Any]):
+async def llm_classify(book_info: Dict[str, Any], current_user: User = Depends(get_current_active_user)):
     """
     测试LLM分类书籍功能
 
@@ -81,7 +83,7 @@ async def llm_classify(book_info: Dict[str, Any]):
 
 
 @router.post("/llm/analyze")
-async def llm_analyze(book_info: Dict[str, Any]):
+async def llm_analyze(book_info: Dict[str, Any], current_user: User = Depends(get_current_active_user)):
     """
     测试LLM分析书籍阅读水平功能
 
@@ -97,7 +99,7 @@ async def llm_analyze(book_info: Dict[str, Any]):
 
 
 @router.post("/llm/describe")
-async def llm_describe(book_info: Dict[str, Any]):
+async def llm_describe(book_info: Dict[str, Any], current_user: User = Depends(get_current_active_user)):
     """
     测试LLM生成书籍语义描述功能
 
@@ -113,7 +115,7 @@ async def llm_describe(book_info: Dict[str, Any]):
 
 
 @router.get("/vector/model")
-async def get_vector_model_info():
+async def get_vector_model_info(current_user: User = Depends(get_current_active_user)):
     """
     获取向量模型信息
     """
@@ -126,7 +128,7 @@ async def get_vector_model_info():
 
 
 @router.post("/vector/get")
-async def get_vector(text: str, summary: str = None):
+async def get_vector(text: str, summary: str = None, current_user: User = Depends(get_current_active_user)):
     """
     测试获取文本向量功能
 
@@ -143,7 +145,7 @@ async def get_vector(text: str, summary: str = None):
 
 
 @router.get("/services")
-async def get_available_services():
+async def get_available_services(current_user: User = Depends(get_current_active_user)):
     """
     获取可用的服务列表
     """
