@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import importlib
 import logging
+import time
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from .rate_limiter import rate_limiter
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +111,32 @@ def create_service_app(service_name: str = "gateway") -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # 全局速率限制中间件
+    @app.middleware("http")
+    async def global_rate_limit(request: Request, call_next):
+        # 健康检查接口不受限
+        if request.url.path in ("/", "/health", "/docs", "/openapi.json", "/redoc"):
+            return await call_next(request)
+
+        client_ip = rate_limiter.get_client_ip(request)
+        ok, remaining, reset_time = rate_limiter.check(client_ip, max_requests=120, window_seconds=60)
+
+        if not ok:
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "请求过于频繁，请稍后再试", "retry_after": int(reset_time - time.time())},
+                headers={
+                    "Retry-After": str(int(reset_time - time.time())),
+                    "X-RateLimit-Limit": "120",
+                    "X-RateLimit-Remaining": "0",
+                },
+            )
+
+        response = await call_next(request)
+        response.headers["X-RateLimit-Limit"] = "120"
+        response.headers["X-RateLimit-Remaining"] = str(remaining)
+        return response
 
     route_specs = SERVICE_ROUTES.get(normalized, SERVICE_ROUTES["gateway"])
 

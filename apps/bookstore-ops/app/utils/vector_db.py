@@ -175,6 +175,7 @@ class VectorDBManager:
         if self.table is None:
             return
 
+        assert isinstance(book_id, int), "book_id must be an integer"
         self.table.delete(f"book_id = {book_id}")
 
     def update_vector(

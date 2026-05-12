@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import hashlib
 import logging
 import uuid
+import numpy as np
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
@@ -62,19 +63,22 @@ class LocalVectorDB:
         filters: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """搜索相似书籍"""
-        # 简单的余弦相似度计算
-        def cosine_similarity(vec1, vec2):
-            import math
-            dot_product = sum(v1 * v2 for v1, v2 in zip(vec1, vec2))
-            norm1 = math.sqrt(sum(v * v for v in vec1))
-            norm2 = math.sqrt(sum(v * v for v in vec2))
-            if norm1 == 0 or norm2 == 0:
-                return 0.0
-            return dot_product / (norm1 * norm2)
+        # 向量化的余弦相似度计算
+        def cosine_similarity(query, vectors_dict):
+            if not vectors_dict:
+                return {}
+            point_ids = list(vectors_dict.keys())
+            vecs = np.array(list(vectors_dict.values()), dtype=np.float32)
+            q = np.array(query, dtype=np.float32)
+            dot_products = vecs.dot(q)
+            norms = np.linalg.norm(vecs, axis=1) * np.linalg.norm(q)
+            norms = np.where(norms == 0, 1.0, norms)  # 避免除零
+            scores = dot_products / norms
+            return dict(zip(point_ids, scores.tolist()))
 
+        scores = cosine_similarity(query_vector, self.vectors)
         results = []
-        for point_id, vector in self.vectors.items():
-            score = cosine_similarity(query_vector, vector)
+        for point_id, score in scores.items():
             if score >= score_threshold:
                 book_id = int(point_id.split("_")[1])
                 book_metadata = self.metadata.get(point_id, {})
