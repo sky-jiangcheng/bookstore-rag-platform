@@ -3,7 +3,10 @@
 集成向量检索、数据库查询、库存检查
 """
 
+import os
 from typing import Dict, List, Optional
+
+import httpx
 
 from .registry import tool, tool_registry
 
@@ -34,85 +37,95 @@ def _category_matches(requested: Optional[str], actual: str) -> bool:
     return False
 
 
-# 模拟向量存储（实际项目中使用真实的 Milvus/Weaviate）
-class MockVectorStore:
-    """模拟向量存储"""
+# ============================================================
+# Agentic RAG 向量检索客户端
+# 调用 bookstore-agentic-rag 服务的真实向量搜索接口
+# ============================================================
+
+class AgenticRAGClient:
+    """
+    连接 bookstore-agentic-rag 的向量搜索服务。
+
+    通过 HTTP 调用 agentic-rag 的 /api/rag/search 接口，
+    获取基于语义的向量检索结果。
+    """
 
     def __init__(self):
-        # 模拟书籍数据
-        self.books = [
-            {
-                "id": 1,
-                "title": "Python编程从入门到实践",
-                "author": "Eric Matthes",
-                "price": 89.0,
-                "category": "Python",
-                "embedding": [0.1, 0.2, 0.3],
-            },
-            {
-                "id": 2,
-                "title": "算法导论",
-                "author": "Thomas Cormen",
-                "price": 128.0,
-                "category": "算法",
-                "embedding": [0.2, 0.3, 0.4],
-            },
-            {
-                "id": 3,
-                "title": "深度学习",
-                "author": "Ian Goodfellow",
-                "price": 168.0,
-                "category": "机器学习",
-                "embedding": [0.3, 0.4, 0.5],
-            },
-            {
-                "id": 4,
-                "title": "Java核心技术",
-                "author": "Cay Horstmann",
-                "price": 149.0,
-                "category": "Java",
-                "embedding": [0.15, 0.25, 0.35],
-            },
-            {
-                "id": 5,
-                "title": "数据结构与算法分析",
-                "author": "Mark Allen Weiss",
-                "price": 79.0,
-                "category": "算法",
-                "embedding": [0.25, 0.35, 0.45],
-            },
-        ]
+        rag_url = os.environ.get("AGENTIC_RAG_URL")
+        if not rag_url:
+            raise RuntimeError(
+                "环境变量 AGENTIC_RAG_URL 未设置，请指定 agentic-rag 服务的地址"
+            )
+        self.base_url = rag_url.rstrip("/")
+        self.timeout = float(os.environ.get("AGENTIC_RAG_TIMEOUT", "5"))
 
     def search(self, query: str, top_k: int = 10) -> List[Dict]:
-        """模拟向量搜索"""
-        # 简单的关键词匹配模拟
-        results = []
-        query_lower = query.lower()
+        """
+        调用 agentic-rag 的向量搜索服务。
 
-        for book in self.books:
-            score = 0.0
-            if query_lower in book["title"].lower():
-                score += 0.8
-            if query_lower in book["category"].lower():
-                score += 0.6
-            if query_lower in book["author"].lower():
-                score += 0.4
-            if any(token in query_lower for token in ["编程", "程序", "开发", "软件"]):
-                if _category_matches("编程", book["category"]):
-                    score += 0.3
+        Args:
+            query: 搜索查询（自然语言描述）
+            top_k: 返回结果数量
 
-            if score > 0:
-                book_copy = book.copy()
-                book_copy["score"] = min(score, 1.0)
-                results.append(book_copy)
+        Returns:
+            List[Dict]: 书籍列表，包含相关度分数
 
-        # 按分数排序
-        results.sort(key=lambda x: x["score"], reverse=True)
-        return results[:top_k]
+        Raises:
+            RuntimeError: 当 agentic-rag 服务不可用或返回错误时抛出
+        """
+        url = f"{self.base_url}/api/rag/search"
+        params = {"query": query, "top_k": min(top_k, 50)}
+
+        with httpx.Client(timeout=self.timeout) as client:
+            resp = client.get(url, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+
+        if not data.get("success"):
+            raise RuntimeError(
+                f"agentic-rag 搜索返回错误: {data.get('error', 'unknown')}"
+            )
+
+        results = data.get("results", [])
+        mapped = []
+        for r in results:
+            mapped.append({
+                "id": int(r.get("book_id", 0)),
+                "title": r.get("title", ""),
+                "author": r.get("author", ""),
+                "price": r.get("price", 0),
+                "category": r.get("category", ""),
+                "score": r.get("relevance_score", 0),
+            })
+        return mapped[:top_k]
 
 
-# 全局向量存储实例
-vector_store = MockVectorStore()
+# 全局向量检索客户端实例
+vector_store = AgenticRAGClient()
+
+# 本地备用书籍数据（供 db_query / get_popular_books 使用）
+FALLBACK_BOOKS = [
+    {"id": 1, "title": "Python编程从入门到实践", "author": "Eric Matthes",
+     "price": 89.0, "category": "Python"},
+    {"id": 2, "title": "算法导论", "author": "Thomas Cormen",
+     "price": 128.0, "category": "算法"},
+    {"id": 3, "title": "深度学习", "author": "Ian Goodfellow",
+     "price": 168.0, "category": "机器学习"},
+    {"id": 4, "title": "Java核心技术", "author": "Cay Horstmann",
+     "price": 149.0, "category": "Java"},
+    {"id": 5, "title": "数据结构与算法分析", "author": "Mark Allen Weiss",
+     "price": 79.0, "category": "算法"},
+    {"id": 6, "title": "流畅的Python", "author": "Luciano Ramalho",
+     "price": 139.0, "category": "Python"},
+    {"id": 7, "title": "机器学习实战", "author": "Peter Harrington",
+     "price": 89.0, "category": "机器学习"},
+    {"id": 8, "title": "数据库系统概论", "author": "王珊",
+     "price": 59.0, "category": "数据库"},
+    {"id": 9, "title": "计算机网络", "author": "谢希仁",
+     "price": 49.0, "category": "网络"},
+    {"id": 10, "title": "操作系统概论", "author": "汤小丹",
+     "price": 55.0, "category": "操作系统"},
+]
 
 
 @tool(name="vector_search", description="基于语义的向量检索")
@@ -164,10 +177,10 @@ def db_query_tool(
     Returns:
         List[Dict]: 符合条件的书籍列表
     """
-    # 模拟数据库查询
+    # 本地模拟数据库查询（基于 fallback 书籍数据）
     results = []
 
-    for book in vector_store.books:
+    for book in FALLBACK_BOOKS:
         # 分类过滤
         if not _category_matches(category, book["category"]):
             continue
@@ -246,7 +259,7 @@ def get_popular_books_tool(category: str = None, limit: int = 10) -> List[Dict]:
 
     results = []
     for pop in popular:
-        book = next((b for b in vector_store.books if b["id"] == pop["id"]), None)
+        book = next((b for b in FALLBACK_BOOKS if b["id"] == pop["id"]), None)
         if book:
             # 分类过滤
             if not _category_matches(category, book["category"]):

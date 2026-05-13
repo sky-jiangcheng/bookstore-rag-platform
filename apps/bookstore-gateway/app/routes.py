@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from .api import (
     agent_api,
+    agent_proxy,
     async_import,
     auth_management,
     batch_search,
@@ -52,3 +53,4 @@ router.include_router(task_management.router, prefix="/api/v1/tasks", tags=["任
 router.include_router(async_import.router, prefix="/api/v1/import", tags=["异步导入"])
 router.include_router(batch_search.router, prefix="/api/v1/search", tags=["批量搜索"])
 router.include_router(agent_api.router)
+router.include_router(agent_proxy.router, prefix="/api/v1/agent", tags=["Agent Proxy"])

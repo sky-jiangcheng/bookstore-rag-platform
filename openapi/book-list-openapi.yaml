@@ -1,0 +1,200 @@
+openapi: 3.0.3
+info:
+  title: BookList Agentic API
+  version: 1.0.0
+  description: OpenAPI spec for book-list parse/generate/session endpoints (Agentic RAG)
+servers:
+  - url: https://{host}
+    variables:
+      host:
+        default: bookstore-agentic-rag.vercel.app
+paths:
+  /api/v1/book-list/parse:
+    post:
+      summary: Parse user requirements into structured requirements
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_input:
+                  type: string
+                use_history:
+                  type: boolean
+              required: [user_input]
+      responses:
+        '200':
+          description: Parsed requirements
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParseRequirementsResponse'
+  /api/v1/book-list/generate:
+    post:
+      summary: Generate a book list from parsed requirements or request_id
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                request_id:
+                  type: string
+                requirements:
+                  $ref: '#/components/schemas/ParsedRequirements'
+                limit:
+                  type: integer
+                save_to_history:
+                  type: boolean
+      responses:
+        '200':
+          description: Generated book list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenerateBookListResponse'
+        '202':
+          description: Generation accepted (async)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+  /api/v1/book-list/{request_id}:
+    get:
+      summary: Get book-list session/status
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request_id:
+                    type: string
+                  status:
+                    type: string
+                  parsed_requirements:
+                    $ref: '#/components/schemas/ParsedRequirements'
+                  recommendations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Book'
+  /api/v1/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Book:
+      type: object
+      properties:
+        book_id:
+          type: string
+        barcode:
+          type: string
+        title:
+          type: string
+        author:
+          type: string
+        publisher:
+          type: string
+        price:
+          type: number
+        stock:
+          type: integer
+        match_score:
+          type: number
+        category:
+          type: string
+        source:
+          type: string
+        remark:
+          type: string
+    ParsedRequirements:
+      type: object
+      properties:
+        target_audience:
+          type: object
+        cognitive_level:
+          type: string
+        categories:
+          type: array
+          items:
+            type: object
+        keywords:
+          type: array
+          items:
+            type: string
+        constraints:
+          type: object
+    ParseRequirementsResponse:
+      type: object
+      properties:
+        request_id:
+          type: string
+        parsed_requirements:
+          $ref: '#/components/schemas/ParsedRequirements'
+        confidence_score:
+          type: number
+        needs_confirmation:
+          type: boolean
+        message:
+          type: string
+    GenerateBookListResponse:
+      type: object
+      properties:
+        request_id:
+          type: string
+        session_id:
+          type: integer
+        book_list_id:
+          type: integer
+        requirements:
+          $ref: '#/components/schemas/ParsedRequirements'
+        recommendations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Book'
+        total_count:
+          type: integer
+        category_distribution:
+          type: object
+        generation_time_ms:
+          type: integer
+        success:
+          type: boolean
+        message:
+          type: string
