@@ -116,12 +116,14 @@ def create_service_app(service_name: str = "gateway") -> FastAPI:
     @asynccontextmanager
     async def _lifespan(app: FastAPI):
         # --- Startup ---
-        # Create the shared httpx client used by agent_proxy
-        app.state.agentic_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(25.0),
-            limits=httpx.Limits(max_keepalive_connections=10, max_connections=50),
-        )
-        logger.info("agentic httpx client created")
+        # Only create the httpx client for services that use agent_proxy
+        _needs_proxy = normalized in {"platform", "gateway"}
+        if _needs_proxy:
+            app.state.agentic_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(25.0),
+                limits=httpx.Limits(max_keepalive_connections=10, max_connections=50),
+            )
+            logger.info("agentic httpx client created (service=%s)", normalized)
 
         # Bootstrap database & runtime
         from .bootstrap import initialize_runtime

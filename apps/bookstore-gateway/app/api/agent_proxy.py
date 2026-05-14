@@ -1,7 +1,7 @@
 """
 Agent Proxy - Orchestrates calls from local-platform to agentic-rag backend.
 Forwards parse/generate/export requests, injects/forwards auth, adds retries,
-error mapping, X-Request-ID propagation, and Prometheus metrics.
+circuit-breaker protection, error mapping, X-Request-ID propagation, and Prometheus metrics.
 
 The shared httpx.AsyncClient is created/closed via FastAPI lifespan in
 service_factory.create_service_app() and stored on app.state.agentic_client.
@@ -26,6 +26,23 @@ router = APIRouter()
 
 AGENTIC_BASE = os.environ.get("AGENTIC_BASE_URL", "https://bookstore-agentic-rag.vercel.app")
 SERVICE_TOKEN = os.environ.get("AGENTIC_SERVICE_TOKEN")
+
+# Concurrency limiter — cap simultaneous upstream requests to avoid overwhelming RAG
+_MAX_CONCURRENT = int(os.environ.get("AGENTIC_MAX_CONCURRENT", "20"))
+_concurrency = asyncio.Semaphore(_MAX_CONCURRENT)
+
+# Circuit breaker for upstream agentic service
+from app.core.circuit_breaker import create_circuit_breaker
+_agentic_breaker = create_circuit_breaker(
+    "agentic_rag",
+    fail_max=5,
+    reset_timeout=60,
+    alert_message="Upstream agentic-RAG service is unreachable",
+)
+
+
+class UpstreamCircuitOpenError(Exception):
+    """Raised when the agentic upstream circuit breaker is open."""
 
 
 def _get_client(request: Request) -> httpx.AsyncClient:
@@ -66,37 +83,60 @@ async def forward_request(
     headers: dict,
     endpoint_label: str = "agent",
 ):
-    """Forward a request with retry/backoff and metrics."""
-    url = AGENTIC_BASE.rstrip("/") + path
-    retries = 2
-    backoff_base = 0.3
-    start = time.time()
+    """Forward a request with concurrency limit, circuit-breaker check, retry/backoff and metrics."""
+    # Fast-fail if circuit breaker is open
+    if _agentic_breaker.is_open:
+        raise UpstreamCircuitOpenError(
+            f"Circuit breaker open for agentic service (failures={_agentic_breaker._fail_count})"
+        )
 
-    for attempt in range(retries + 1):
-        try:
-            resp = await client.post(url, json=json_body, headers=headers)
-            if resp.status_code >= 500 and attempt < retries:
-                sleep_s = backoff_base * (2 ** attempt)
-                MetricsCollector.record_proxy_retry(endpoint_label, f"status_{resp.status_code}")
-                logger.info(
-                    "Transient error %d from agentic (%s), retry %.2fs",
-                    resp.status_code, path, sleep_s,
-                )
-                await asyncio.sleep(sleep_s)
-                continue
-            return resp
-        except httpx.RequestError as exc:
-            if attempt < retries:
-                sleep_s = backoff_base * (2 ** attempt)
-                MetricsCollector.record_proxy_retry(endpoint_label, type(exc).__name__)
-                logger.info("httpx error, retry %.2fs: %s", sleep_s, exc)
-                await asyncio.sleep(sleep_s)
-                continue
-            duration = time.time() - start
-            MetricsCollector.record_error("upstream_unavailable", endpoint_label)
-            MetricsCollector.record_proxy_forward(endpoint_label, 502, duration)
-            logger.error("Request to agentic failed after %d attempts (%.2fs): %s", retries + 1, duration, exc)
-            raise
+    if _concurrency.locked():
+        logger.warning("Agentic concurrency limit (%d) reached, rejecting %s", _MAX_CONCURRENT, path)
+
+    async with _concurrency:
+        url = AGENTIC_BASE.rstrip("/") + path
+        retries = 2
+        backoff_base = 0.3
+        start = time.time()
+
+        for attempt in range(retries + 1):
+            try:
+                resp = await client.post(url, json=json_body, headers=headers)
+                if resp.status_code >= 500 and attempt < retries:
+                    sleep_s = backoff_base * (2 ** attempt)
+                    MetricsCollector.record_proxy_retry(endpoint_label, f"status_{resp.status_code}")
+                    logger.info(
+                        "Transient error %d from agentic (%s), retry %.2fs",
+                        resp.status_code, path, sleep_s,
+                    )
+                    await asyncio.sleep(sleep_s)
+                    continue
+
+                # Record success/failure with circuit breaker
+                if resp.status_code >= 500:
+                    await _agentic_breaker._record_failure(
+                        Exception(f"upstream returned {resp.status_code}"),
+                        int((time.time() - start) * 1000),
+                    )
+                else:
+                    await _agentic_breaker._record_success(
+                        int((time.time() - start) * 1000)
+                    )
+
+                return resp
+            except httpx.RequestError as exc:
+                if attempt < retries:
+                    sleep_s = backoff_base * (2 ** attempt)
+                    MetricsCollector.record_proxy_retry(endpoint_label, type(exc).__name__)
+                    logger.info("httpx error, retry %.2fs: %s", sleep_s, exc)
+                    await asyncio.sleep(sleep_s)
+                    continue
+                duration = time.time() - start
+                MetricsCollector.record_error("upstream_unavailable", endpoint_label)
+                MetricsCollector.record_proxy_forward(endpoint_label, 502, duration)
+                await _agentic_breaker._record_failure(exc, int(duration * 1000))
+                logger.error("Request to agentic failed after %d attempts (%.2fs): %s", retries + 1, duration, exc)
+                raise
 
     # Should not reach here, but satisfy type checkers
     raise httpx.RequestError("Exhausted retries")
@@ -122,6 +162,8 @@ async def proxy_parse(
 
     try:
         resp = await forward_request(client, "/api/v1/book-list/parse", body, headers, "agent_parse")
+    except UpstreamCircuitOpenError:
+        raise HTTPException(status_code=503, detail="Agentic service temporarily unavailable (circuit open)")
     except Exception:
         logger.exception("Failed to forward parse request")
         raise HTTPException(status_code=502, detail="Forwarding to agentic service failed")
@@ -149,6 +191,8 @@ async def proxy_generate(
 
     try:
         resp = await forward_request(client, "/api/v1/book-list/generate", body, headers, "agent_generate")
+    except UpstreamCircuitOpenError:
+        raise HTTPException(status_code=503, detail="Agentic service temporarily unavailable (circuit open)")
     except Exception:
         logger.exception("Failed to forward generate request")
         raise HTTPException(status_code=502, detail="Forwarding to agentic service failed")
@@ -171,28 +215,20 @@ async def proxy_export(
 ):
     """Proxy export request and stream binary response (e.g., Excel) back to client."""
     client = _get_client(request)
-    auth_header = request.headers.get("Authorization")
+    headers = _build_headers(request, request.headers.get("Authorization"))
+    # Override Accept for binary response
+    headers["Accept"] = "*/*"
+    request_id = headers["X-Request-ID"]
+
+    # Fast-fail if circuit breaker is open
+    if _agentic_breaker.is_open:
+        raise HTTPException(status_code=503, detail="Agentic service temporarily unavailable (circuit open)")
+
     url = AGENTIC_BASE.rstrip("/") + "/api/v1/book-list/export-excel"
-    headers = {"Accept": "*/*", "Content-Type": "application/json"}
-
-    if auth_header:
-        headers["Authorization"] = auth_header
-    elif SERVICE_TOKEN:
-        headers["Authorization"] = f"Bearer {SERVICE_TOKEN}"
-
-    # Propagate tracing headers
-    request_id = request.headers.get("X-Request-ID") or getattr(
-        request.state, "request_id", None
-    ) or str(uuid.uuid4())
-    headers["X-Request-ID"] = request_id
-    traceparent = request.headers.get("traceparent")
-    if traceparent:
-        headers["traceparent"] = traceparent
-
     start = time.time()
 
     try:
-        stream = await client.stream("POST", url, json=body, headers=headers)
+        stream = await client.stream("POST", url, json=body, headers=headers, timeout=httpx.Timeout(60.0, read=120.0))
     except Exception:
         MetricsCollector.record_error("upstream_unavailable", "agent_export")
         logger.exception("Failed to stream export from agentic")
@@ -202,23 +238,32 @@ async def proxy_export(
         content = _parse_response_content(await stream.aread())
         duration = time.time() - start
         MetricsCollector.record_proxy_forward("agent_export", stream.status_code, duration)
+        if stream.status_code >= 500:
+            await _agentic_breaker._record_failure(
+                Exception(f"export upstream returned {stream.status_code}"),
+                int(duration * 1000),
+            )
         raise HTTPException(status_code=stream.status_code, detail=content)
+
+    # Record success with circuit breaker
+    await _agentic_breaker._record_success(int((time.time() - start) * 1000))
 
     content_type = stream.headers.get("content-type", "application/octet-stream")
     disposition = stream.headers.get("content-disposition")
 
     async def iter_bytes():
-        async for chunk in stream.aiter_bytes():
-            yield chunk
-        await stream.aclose()
+        try:
+            async for chunk in stream.aiter_bytes():
+                yield chunk
+        finally:
+            await stream.aclose()
+            # Record metrics after streaming actually completes
+            duration = time.time() - start
+            MetricsCollector.record_proxy_forward("agent_export", stream.status_code, duration)
 
     response = StreamingResponse(iter_bytes(), media_type=content_type)
     if disposition:
         response.headers["Content-Disposition"] = disposition
     response.headers["X-Request-ID"] = request_id
-
-    # Record metrics after streaming completes (approximate)
-    duration = time.time() - start
-    MetricsCollector.record_proxy_forward("agent_export", stream.status_code, duration)
 
     return response

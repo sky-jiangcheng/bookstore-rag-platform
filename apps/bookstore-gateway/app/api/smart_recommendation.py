@@ -77,7 +77,7 @@ async def get_smart_recommendation(
             limit = 20  # 设置默认值
 
         # 使用可复用的 RAG 后端获取推荐；若配置了 RAG_SERVICE_URL，则透明切到独立服务。
-        result = rag_service.get_book_recommendations(
+        result = await rag_service.get_book_recommendations(
             user_input=user_input,
             db=db,
             limit=limit,
@@ -134,7 +134,7 @@ async def chat_with_book_recommender(
             raise HTTPException(status_code=400, detail="用户输入不能为空")
 
         # 使用可复用的 RAG 后端获取推荐
-        result = rag_service.get_book_recommendations(
+        result = await rag_service.get_book_recommendations(
             user_input=user_input,
             db=db,
             limit=limit,

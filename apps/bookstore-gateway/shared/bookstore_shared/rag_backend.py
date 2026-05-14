@@ -12,7 +12,8 @@ import logging
 import os
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Protocol
-from urllib import error, request
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 class RAGBackend(Protocol):
     """Minimal interface used by the recommendation endpoints."""
 
-    def get_book_recommendations(
+    async def get_book_recommendations(
         self,
         user_input: str,
         db: Any = None,
@@ -32,55 +33,49 @@ class RAGBackend(Protocol):
 
 @dataclass
 class RemoteRAGService:
-    """HTTP client for a dedicated rag service."""
+    """Async HTTP client for a dedicated rag service."""
 
     base_url: str
     timeout_seconds: float = 30.0
 
-    def get_book_recommendations(
+    async def get_book_recommendations(
         self,
         user_input: str,
         db: Any = None,
         limit: int = 20,
         authorization: Optional[str] = None,
     ) -> Dict[str, Any]:
-        payload = json.dumps(
-            {"user_input": user_input, "limit": limit},
-            ensure_ascii=False,
-        ).encode("utf-8")
-
+        payload = {"user_input": user_input, "limit": limit}
         headers = {"Content-Type": "application/json"}
         if authorization:
             headers["Authorization"] = authorization
 
-        req = request.Request(
-            f"{self.base_url}/smart/recommendation",
-            data=payload,
-            headers=headers,
-            method="POST",
-        )
+        url = f"{self.base_url}/smart/recommendation"
 
-        try:
-            with request.urlopen(req, timeout=self.timeout_seconds) as response:
-                body = response.read().decode("utf-8")
-        except error.HTTPError as exc:
-            body = exc.read().decode("utf-8", errors="replace")
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(self.timeout_seconds),
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=20),
+        ) as client:
+            try:
+                resp = await client.post(url, json=payload, headers=headers)
+            except httpx.RequestError as exc:
+                raise RuntimeError(f"Remote RAG service unreachable: {exc}") from exc
+
+        if resp.status_code >= 400:
             logger.error(
                 "Remote RAG request failed with HTTP %s: %s",
-                exc.code,
-                body,
+                resp.status_code,
+                resp.text[:500],
             )
             raise RuntimeError(
-                f"Remote RAG service returned HTTP {exc.code}: {body}"
-            ) from exc
-        except error.URLError as exc:
-            raise RuntimeError(f"Remote RAG service unreachable: {exc.reason}") from exc
+                f"Remote RAG service returned HTTP {resp.status_code}: {resp.text[:500]}"
+            )
 
         try:
-            return json.loads(body)
+            return resp.json()
         except json.JSONDecodeError as exc:
             raise RuntimeError(
-                f"Remote RAG service returned invalid JSON: {body}"
+                f"Remote RAG service returned invalid JSON: {resp.text[:500]}"
             ) from exc
 
 
@@ -90,7 +85,7 @@ class LocalRAGService:
 
     service: Any
 
-    def get_book_recommendations(
+    async def get_book_recommendations(
         self,
         user_input: str,
         db: Any = None,
