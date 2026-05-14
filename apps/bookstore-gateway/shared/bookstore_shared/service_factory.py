@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import logging
 import os
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -14,6 +15,7 @@ from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +50,7 @@ SERVICE_ROUTES: Dict[str, List[RouterSpec]] = {
         RouterSpec("app.api.async_import", "/api/v1/import", ("异步导入",)),
         RouterSpec("app.api.batch_search", "/api/v1/search", ("批量搜索",)),
         RouterSpec("app.api.agent_api", "", ()),
+        RouterSpec("app.api.agent_proxy", "/api/v1/agent", ("Agent Proxy",)),
     ],
     "platform": [
         RouterSpec("app.api.auth_management", "/api/v1/auth", ("认证",)),
@@ -110,10 +113,34 @@ def create_service_app(service_name: str = "gateway") -> FastAPI:
 
     from app.config import CORS_ORIGINS
 
+    @asynccontextmanager
+    async def _lifespan(app: FastAPI):
+        # --- Startup ---
+        # Create the shared httpx client used by agent_proxy
+        app.state.agentic_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(25.0),
+            limits=httpx.Limits(max_keepalive_connections=10, max_connections=50),
+        )
+        logger.info("agentic httpx client created")
+
+        # Bootstrap database & runtime
+        from .bootstrap import initialize_runtime
+        from app.utils.database import engine
+        app.state.database_ready = initialize_runtime(engine=engine, logger=logger)
+
+        yield
+
+        # --- Shutdown ---
+        client: httpx.AsyncClient | None = getattr(app.state, "agentic_client", None)
+        if client is not None:
+            await client.aclose()
+            logger.info("agentic httpx client closed")
+
     app = FastAPI(
         title=f"书店智能管理系统API ({normalized})",
         description="基于AI的书店管理系统API",
         version="1.0.0",
+        lifespan=_lifespan,
     )
     app.state.service_name = normalized
     app.state.database_ready = False
@@ -178,12 +205,5 @@ def create_service_app(service_name: str = "gateway") -> FastAPI:
         @app.get("/")
         async def root():
             return {"message": "书店智能管理系统API", "service": normalized}
-
-    @app.on_event("startup")
-    async def startup_event():
-        from .bootstrap import initialize_runtime
-        from app.utils.database import engine
-
-        app.state.database_ready = initialize_runtime(engine=engine, logger=logger)
 
     return app

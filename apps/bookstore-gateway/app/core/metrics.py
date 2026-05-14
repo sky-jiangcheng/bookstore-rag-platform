@@ -261,6 +261,33 @@ exceptions_total = Counter(
     registry=metrics_registry
 )
 
+# ==================== Agent Proxy 转发指标 ====================
+
+# 代理转发请求计数
+proxy_forward_total = Counter(
+    'bookstore_proxy_forward_total',
+    'Total agent proxy forward requests',
+    ['endpoint', 'status'],
+    registry=metrics_registry
+)
+
+# 代理转发延迟
+proxy_forward_duration = Histogram(
+    'bookstore_proxy_forward_duration_seconds',
+    'Agent proxy forward request duration',
+    ['endpoint'],
+    buckets=(0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 25.0),
+    registry=metrics_registry
+)
+
+# 代理转发重试计数
+proxy_forward_retries = Counter(
+    'bookstore_proxy_forward_retries_total',
+    'Total agent proxy forward retries',
+    ['endpoint', 'reason'],
+    registry=metrics_registry
+)
+
 
 # ==================== 便捷装饰器 ====================
 
@@ -416,6 +443,17 @@ class MetricsCollector:
     def set_active_users(count: int):
         """设置活跃用户数"""
         active_users.set(count)
+
+    @staticmethod
+    def record_proxy_forward(endpoint: str, status: int, duration: float):
+        """记录代理转发"""
+        proxy_forward_total.labels(endpoint=endpoint, status=status).inc()
+        proxy_forward_duration.labels(endpoint=endpoint).observe(duration)
+
+    @staticmethod
+    def record_proxy_retry(endpoint: str, reason: str):
+        """记录代理重试"""
+        proxy_forward_retries.labels(endpoint=endpoint, reason=reason).inc()
 
 
 # ==================== 指标导出 ====================
