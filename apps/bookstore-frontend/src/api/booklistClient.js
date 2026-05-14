@@ -35,7 +35,7 @@ export async function submitFeedback(data) {
 }
 
 export async function exportBookList(data) {
-  const resp = await client.post('/book-list/export-excel', data, {
+  const resp = await client.post('/agent/export', data, {
     responseType: 'blob'  // 重要：接收二进制文件
   })
   return resp.data
