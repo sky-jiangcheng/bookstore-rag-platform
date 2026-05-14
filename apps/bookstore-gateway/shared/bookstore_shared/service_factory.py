@@ -55,9 +55,12 @@ SERVICE_ROUTES: Dict[str, List[RouterSpec]] = {
         RouterSpec("app.api.recommendation", "/api/v1/recommendation", ("推荐管理",)),
         RouterSpec("app.api.book_list_recommendation_agentic", "", ("书单管理（AgentScope 主线）",)),
         RouterSpec("app.api.book_list_template", "", ("书单模板管理",)),
+        RouterSpec("app.api.book_list_feedback", "", ("书单满意度反馈",)),
+        RouterSpec("app.api.book_list_export", "", ("书单导出",)),
         RouterSpec("app.api.v1.book_list.utilities", "", ("书单管理辅助接口",)),
         RouterSpec("app.api.demand_analysis", "", ("需求解析",)),
         RouterSpec("app.api.agent_api", "", ()),
+        RouterSpec("app.api.agent_proxy", "/api/v1/agent", ("Agent Proxy",)),
     ],
     "auth": [
         RouterSpec("app.api.auth_management", "/api/v1/auth", ("认证",)),
