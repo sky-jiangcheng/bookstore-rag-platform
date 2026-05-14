@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import request from '@/utils/request'
 import { nextTick } from 'vue'
-import { exportBookListToExcel } from '@/utils/booklistExport'
+import { smartExportBookList } from '@/utils/booklistExport'
 
 export const useInteractiveBookListStore = defineStore('interactiveBookList', {
   state: () => ({
@@ -139,7 +139,7 @@ export const useInteractiveBookListStore = defineStore('interactiveBookList', {
     },
 
     // ===== Step 3: Export =====
-    exportBookList() {
+    async exportBookList() {
       try {
         const books = this.bookListData?.books?.length
           ? this.bookListData.books
@@ -149,17 +149,12 @@ export const useInteractiveBookListStore = defineStore('interactiveBookList', {
           return { success: false, message: '当前没有可导出的书单' }
         }
 
-        exportBookListToExcel({
-          books,
-          total_price: this.bookListData?.total_price || 0,
-          quality_score: this.bookListData?.quality_score || 0,
-          confidence: this.bookListData?.confidence || 0,
-          category_distribution: this.bookListData?.category_distribution || {}
-        }, {
-          booklistName: this.bookListData?.name || this.parsedData?.parsed_requirements?.target_audience || '书单'
+        const filename = await smartExportBookList(books, {
+          booklistName: this.bookListData?.name || this.parsedData?.parsed_requirements?.target_audience || '书单',
+          totalPrice: this.bookListData?.total_price || 0,
         })
 
-        return { success: true, message: '书单已导出为 Excel' }
+        return { success: true, message: `书单已导出为 ${filename}` }
       } catch (err) {
         console.error('Export interactive booklist failed:', err)
         return { success: false, message: err.message || '导出失败' }

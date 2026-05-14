@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { recommendationApi } from '@/api'
-import { exportBookListToExcel } from '@/utils/booklistExport'
+import { smartExportBookList } from '@/utils/booklistExport'
 
 /**
  * 智能推荐Store
@@ -336,9 +336,9 @@ export const useRecommendationStore = defineStore('recommendation', {
     },
 
     /**
-     * 导出当前书单为 Excel
+     * 导出当前书单为 Excel（优先后端xlsx，失败时前端HTML）
      */
-    exportBookList() {
+    async exportBookList() {
       try {
         const books = this.selectedBooks.length > 0
           ? this.selectedBooks
@@ -348,17 +348,13 @@ export const useRecommendationStore = defineStore('recommendation', {
           return { success: false, message: '当前没有可导出的书单' }
         }
 
-        exportBookListToExcel({
-          books,
-          total_price: this.selectedTotalPrice,
-          quality_score: this.averageScore,
-          confidence: 0,
-          category_distribution: {}
-        }, {
-          booklistName: this.advancedForm.name || '书单'
+        const filename = await smartExportBookList(books, {
+          booklistName: this.advancedForm.name || '书单',
+          budget: this.advancedForm.budget,
+          totalPrice: this.selectedTotalPrice,
         })
 
-        return { success: true, message: '书单已导出为 Excel' }
+        return { success: true, message: `书单已导出为 ${filename}` }
       } catch (error) {
         console.error('Export booklist failed:', error)
         return { success: false, message: error.message || '导出失败' }

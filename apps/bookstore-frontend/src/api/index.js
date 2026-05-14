@@ -49,6 +49,18 @@ export const recommendationApi = {
    */
   submitFeedback: (data) => {
     return booklistClient.submitFeedback(data)
+  },
+
+  /**
+   * 导出书单为Excel（后端生成）
+   * @param {Object} data - 导出数据
+   * @param {string} data.booklist_name - 书单名称
+   * @param {Array} data.books - 书籍列表
+   * @param {number} data.budget - 预算（可选）
+   * @param {number} data.total_price - 总价（可选）
+   */
+  exportBookList: (data) => {
+    return booklistClient.exportBookList(data)
   }
 }
 

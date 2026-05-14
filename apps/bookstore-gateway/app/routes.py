@@ -6,6 +6,7 @@ from .api import (
     async_import,
     auth_management,
     batch_search,
+    book_list_export,
     book_list_feedback,
     book_list_recommendation_agentic,
     book_list_template,
@@ -39,6 +40,7 @@ router.include_router(replenishment.router, prefix="/api/v1/replenishment", tags
 router.include_router(book_list_recommendation_agentic.router, tags=["书单管理（AgentScope 主线）"])
 router.include_router(book_list_template.router, tags=["书单模板管理"])
 router.include_router(book_list_feedback.router, tags=["书单满意度反馈"])
+router.include_router(book_list_export.router, tags=["书单导出"])
 router.include_router(utilities.router, tags=["书单管理辅助接口"])
 router.include_router(demand_analysis.router, tags=["需求解析"])
 router.include_router(filter_management.router)

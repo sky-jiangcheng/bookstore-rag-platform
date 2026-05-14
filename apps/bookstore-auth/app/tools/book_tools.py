@@ -100,8 +100,14 @@ class AgenticRAGClient:
         return mapped[:top_k]
 
 
-# 全局向量检索客户端实例
-vector_store = AgenticRAGClient()
+# 全局向量检索客户端（惰性初始化，避免 import 时因缺少环境变量而崩溃）
+_vector_store_instance = None
+
+def _get_vector_store() -> AgenticRAGClient:
+    global _vector_store_instance
+    if _vector_store_instance is None:
+        _vector_store_instance = AgenticRAGClient()
+    return _vector_store_instance
 
 # 本地备用书籍数据（供 db_query / get_popular_books 使用）
 FALLBACK_BOOKS = [
@@ -140,7 +146,8 @@ def vector_search_tool(query: str, top_k: int = 20) -> List[Dict]:
     Returns:
         List[Dict]: 书籍列表，包含相关度分数
     """
-    results = vector_store.search(query, top_k)
+    store = _get_vector_store()
+    results = store.search(query, top_k)
 
     return [
         {

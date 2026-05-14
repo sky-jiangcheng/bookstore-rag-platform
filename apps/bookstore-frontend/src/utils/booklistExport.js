@@ -1,4 +1,5 @@
 const EXCEL_MIME = 'application/vnd.ms-excel;charset=utf-8'
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -217,4 +218,95 @@ export function exportBookListToCsv(booklistOrBooks, options = {}) {
   URL.revokeObjectURL(url)
 
   return filename
+}
+
+/**
+ * \u4e0b\u8f7d\u540e\u7aef\u8fd4\u56de\u7684Excel\u6587\u4ef6
+ * @param {Blob|ArrayBuffer} blob - \u4e8c\u8fdb\u5236\u6570\u636e
+ * @param {string} filename - \u6587\u4ef6\u540d
+ */
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+  return filename
+}
+
+/**
+ * \u5bfc\u51fa\u4e66\u5355\u4e3a\u771f\u6b63\u7684xlsx\u6587\u4ef6\uff08\u4f18\u5148\u540e\u7aef\u751f\u6210\uff0c\u5931\u8d25\u65f6\u56de\u9000\u5230\u524d\u7aefHTML\uff09
+ * @param {Object} booklistOrBooks - \u4e66\u5355\u6216\u4e66\u7c4d\u5217\u8868
+ * @param {Object} options - \u9009\u9879
+ * @param {string} options.booklistName - \u4e66\u5355\u540d\u79f0
+ * @param {number} options.budget - \u9884\u7b97\uff08\u53ef\u9009\uff09
+ * @param {number} options.totalPrice - \u603b\u4ef7\uff08\u53ef\u9009\uff09
+ * @param {Function} options.apiExport - API\u5bfc\u51fa\u51fd\u6570\uff08\u53ef\u9009\uff0c\u9ed8\u8ba4\u4f7f\u7528recommendationApi.exportBookList\uff09
+ * @returns {Promise<string>} \u6587\u4ef6\u540d
+ */
+export async function exportBookListToRealExcel(booklistOrBooks, options = {}) {
+  const books = normalizeBooks(booklistOrBooks)
+  if (books.length === 0) {
+    throw new Error('\u5f53\u524d\u6ca1\u6709\u53ef\u5bfc\u51fa\u7684\u4e66\u5355')
+  }
+
+  const booklistName = normalizeFilename(options.booklistName || booklistOrBooks?.name || '\u4e66\u5355')
+  const dateStr = new Date().toISOString().slice(0, 10)
+  const filename = `${booklistName}_${dateStr}.xlsx`
+
+  // \u51c6\u5907\u8bf7\u6c42\u6570\u636e
+  const exportData = {
+    booklist_name: booklistName,
+    books: books.map(book => ({
+      book_id: book.book_id,
+      title: book.title || '',
+      author: book.author || '',
+      publisher: book.publisher || '',
+      category: book.category || '',
+      price: book.price || 0,
+      stock: book.stock || 0,
+      score: book.score || book.match_score || 0,
+      source: book.source || '',
+      remark: book.remark || '',
+    })),
+  }
+
+  // \u53ef\u9009\u5b57\u6bb5
+  if (options.budget !== undefined) exportData.budget = options.budget
+  if (options.totalPrice !== undefined) exportData.total_price = options.totalPrice
+
+  try {
+    // \u5c1d\u8bd5\u540e\u7aef\u5bfc\u51fa
+    const { recommendation } = await import('@/api')
+    const response = await recommendation.exportBookList(exportData)
+
+    // response\u53ef\u80fd\u662fblob\u6216\u5df2\u5904\u7406\u7684\u6570\u636e
+    let blob
+    if (response instanceof Blob) {
+      blob = response
+    } else if (response.data && response.data instanceof Blob) {
+      blob = response.data
+    } else {
+      // \u5c1d\u8bd5\u4eceresponse\u4e2d\u63d0\u53d6blob
+      throw new Error('API\u8fd4\u56de\u683c\u5f0f\u4e0d\u652f\u6301')
+    }
+
+    return downloadBlob(blob, filename)
+  } catch (backendError) {
+    console.warn('\u540e\u7aef\u5bfc\u51fa\u5931\u8d25\uff0c\u56de\u9000\u5230\u524d\u7aefHTML\u5bfc\u51fa:', backendError.message)
+
+    // \u56de\u9000\u5230\u524d\u7aefHTML\u5bfc\u51fa
+    return exportBookListToExcel(booklistOrBooks, options)
+  }
+}
+
+/**
+ * \u667a\u80fd\u5bfc\u51fa\uff1a\u4f18\u5148\u4f7f\u7528\u540e\u7aefxlsx\uff0c\u5931\u8d25\u65f6\u4f7f\u7528\u524d\u7aefHTML
+ * \u8fd9\u662f\u4e3b\u8981\u5bfc\u51fa\u51fd\u6570\uff0c\u66ff\u6362\u539f\u6765\u7684exportBookListToExcel
+ */
+export async function smartExportBookList(booklistOrBooks, options = {}) {
+  return exportBookListToRealExcel(booklistOrBooks, options)
 }

@@ -34,6 +34,13 @@ export async function submitFeedback(data) {
   return resp.data
 }
 
+export async function exportBookList(data) {
+  const resp = await client.post('/book-list/export-excel', data, {
+    responseType: 'blob'  // 重要：接收二进制文件
+  })
+  return resp.data
+}
+
 export default {
   setAuthToken,
   parseRequirements,
@@ -41,4 +48,5 @@ export default {
   getTemplates,
   getTemplate,
   submitFeedback,
+  exportBookList,
 }

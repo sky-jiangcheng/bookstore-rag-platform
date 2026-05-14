@@ -91,7 +91,7 @@
 import { computed } from 'vue'
 import { Download, Refresh, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { exportBookListToExcel } from '@/utils/booklistExport'
+import { smartExportBookList } from '@/utils/booklistExport'
 
 const props = defineProps({
   data: {
@@ -140,9 +140,9 @@ const getCategoryType = (count) => {
 }
 
 // 导出书单
-const exportBookList = () => {
+const exportBookList = async () => {
   try {
-    exportBookListToExcel(props.data, {
+    await smartExportBookList(props.data, {
       booklistName: props.data?.name || '书单'
     })
     ElMessage.success('书单已导出为 Excel')

@@ -36,7 +36,6 @@
 import { Document, Tickets, Picture } from '@element-plus/icons-vue'
 import { useRecommendationStore } from '@/stores/recommendation'
 import { copyToClipboard } from '@/utils/recommendation'
-import { exportBookListToExcel } from '@/utils/booklistExport'
 import { ElMessage } from 'element-plus'
 
 const store = useRecommendationStore()
@@ -54,14 +53,14 @@ const handleExportPDF = () => {
   ElMessage.info('PDF导出功能开发中...')
 }
 
-const handleExportExcel = () => {
+const handleExportExcel = async () => {
   try {
-    exportBookListToExcel({
-      books: store.selectedBooks
-    }, {
-      booklistName: store.advancedForm.name || '书单'
-    })
-    ElMessage.success('Excel 导出成功')
+    const result = await store.exportBookList()
+    if (result.success) {
+      ElMessage.success(result.message)
+    } else {
+      ElMessage.error(result.message)
+    }
   } catch (error) {
     console.error('Export excel failed:', error)
     ElMessage.error(error.message || 'Excel 导出失败')
