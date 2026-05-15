@@ -189,6 +189,24 @@ class ConfigLoader:
                 "DB_NAME", mysql_config.get("database", "bookstore")
             )
 
+        if config.get("type") == "postgresql" and self._use_env_overrides():
+            pg_config = config.get("postgresql", {})
+            pg_config["host"] = os.getenv(
+                "DB_HOST", pg_config.get("host", "localhost")
+            )
+            pg_config["port"] = int(
+                os.getenv("DB_PORT", pg_config.get("port", 5432))
+            )
+            pg_config["user"] = os.getenv(
+                "DB_USER", pg_config.get("user", "postgres")
+            )
+            pg_config["password"] = os.getenv(
+                "DB_PASSWORD", pg_config.get("password", "")
+            )
+            pg_config["database"] = os.getenv(
+                "DB_NAME", pg_config.get("database", "bookstore")
+            )
+
         return config
 
     def get_database_url(self):
@@ -218,6 +236,18 @@ class ConfigLoader:
                 return (
                     f"mysql+pymysql://{user}@{host}:{port}/{database}?charset={charset}"
                 )
+        elif db_type == "postgresql":
+            pg_config = config["postgresql"]
+            user = pg_config["user"]
+            password = pg_config["password"]
+            host = pg_config["host"]
+            port = pg_config["port"]
+            database = pg_config["database"]
+
+            if password:
+                return f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{database}"
+            else:
+                return f"postgresql+psycopg2://{user}@{host}:{port}/{database}"
         else:
             raise ValueError(f"不支持的数据库类型: {db_type}")
 

@@ -3,6 +3,8 @@ httpx>=0.27.0
 uvicorn[standard]>=0.27.0
 sqlalchemy>=2.0.23
 pymysql==1.1.0
+# psycopg2-binary: 生产 Postgres 连接（pymysql 仅用于开发/MySQL 兼容）
+psycopg2-binary>=2.9.9
 redis==5.0.1
 pandas>=2.2.0
 openpyxl==3.1.2

@@ -171,49 +171,59 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
 @router.post("/register", response_model=Token)
 async def register(user_create: UserCreate, db: Session = Depends(get_db)):
     """注册"""
-    # 检查用户名是否已存在
-    existing_user = db.query(User).filter(User.username == user_create.username).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Username already registered")
+    try:
+        # 检查用户名是否已存在
+        existing_user = db.query(User).filter(User.username == user_create.username).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Username already registered")
 
-    # 检查邮箱是否已存在
-    existing_email = db.query(User).filter(User.email == user_create.email).first()
-    if existing_email:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        # 检查邮箱是否已存在
+        existing_email = db.query(User).filter(User.email == user_create.email).first()
+        if existing_email:
+            raise HTTPException(status_code=400, detail="Email already registered")
 
-    # 创建新用户
-    hashed_password = AuthService.hash_password(user_create.password)
-    new_user = User(
-        username=user_create.username,
-        password_hash=hashed_password,
-        email=user_create.email,
-        name=user_create.name,
-        is_active=True,
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+        # 创建新用户
+        hashed_password = AuthService.hash_password(user_create.password)
+        new_user = User(
+            username=user_create.username,
+            password_hash=hashed_password,
+            email=user_create.email,
+            name=user_create.name,
+            is_active=True,
+        )
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
 
-    # 创建访问token
-    access_token_expires = timedelta(minutes=AuthService.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = AuthService.create_access_token(
-        data={"sub": str(new_user.id), "username": new_user.username},
-        expires_delta=access_token_expires,
-    )
+        # 创建访问token
+        access_token_expires = timedelta(minutes=AuthService.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = AuthService.create_access_token(
+            data={"sub": str(new_user.id), "username": new_user.username},
+            expires_delta=access_token_expires,
+        )
 
-    # 创建刷新token
-    refresh_token = AuthService.create_refresh_token(
-        data={"sub": str(new_user.id), "username": new_user.username}
-    )
+        # 创建刷新token
+        refresh_token = AuthService.create_refresh_token(
+            data={"sub": str(new_user.id), "username": new_user.username}
+        )
 
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-        "user_id": new_user.id,
-        "username": new_user.username,
-        "name": new_user.name,
-    }
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+            "user_id": new_user.id,
+            "username": new_user.username,
+            "name": new_user.name,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception("注册失败: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "Registration failed", "message": str(e)},
+        )
 
 
 @router.post("/refresh", response_model=Token)
