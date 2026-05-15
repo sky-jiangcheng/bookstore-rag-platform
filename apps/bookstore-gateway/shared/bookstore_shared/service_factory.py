@@ -12,8 +12,9 @@ from typing import Dict, List, Tuple
 
 from fastapi import FastAPI
 from fastapi import HTTPException
+from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import httpx
 
@@ -155,6 +156,18 @@ def create_service_app(service_name: str = "gateway") -> FastAPI:
         allow_headers=["*"],
     )
 
+    # 安全响应头中间件
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):
+        response = await call_next(request)
+        # 浏览器安全基线头
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        # API 响应默认不嵌入 iframe
+        if not request.url.path.startswith("/docs"):
+            response.headers.setdefault("X-Frame-Options", "DENY")
+        return response
+
     route_specs = SERVICE_ROUTES.get(normalized, SERVICE_ROUTES["gateway"])
     _app_env = os.getenv("APP_ENV", "development").lower()
     _safe_envs = {"development", "testing"}
@@ -174,6 +187,13 @@ def create_service_app(service_name: str = "gateway") -> FastAPI:
 
     @app.get("/health")
     async def health_check():
+        requires_bootstrap = normalized in {"gateway", "platform"}
+        status = "healthy" if app.state.database_ready or not requires_bootstrap else "degraded"
+        return {"status": status, "service": normalized}
+
+    @app.get("/api/v1/health")
+    async def health_check_v1():
+        """兼容 /api/v1/health 的健康检查端点，返回与 /health 相同的 JSON。"""
         requires_bootstrap = normalized in {"gateway", "platform"}
         status = "healthy" if app.state.database_ready or not requires_bootstrap else "degraded"
         return {"status": status, "service": normalized}
